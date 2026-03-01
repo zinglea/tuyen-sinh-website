@@ -6,7 +6,8 @@ import { getAllNews } from '@/utils/docxParser'
 export const dynamic = 'force-dynamic' // Ensure it rescans the directory on request (in dev)
 
 export default async function TinTuc() {
-  const newsData = await getAllNews()
+  const allData = await getAllNews()
+  const newsData = allData.filter(article => article.contentType !== 'raw_document')
 
   return (
     <div className="min-h-screen bg-slate-50">
