@@ -1,120 +1,55 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { NextRequest, NextResponse } from 'next/server'
-import { getVectorStore } from '@/utils/rag'
 
 // Vercel serverless function timeout (seconds)
 export const maxDuration = 30;
 
-// Simple In-Memory Rate Limiter
+// Rate Limiter
 const rateLimitMap = new Map<string, { count: number, resetTime: number }>();
 const LIMIT = 10;
 const WINDOW_MS = 60 * 1000;
 
-// Conversation history storage (in-memory) - In production, use Redis
-interface ConversationMessage {
-  role: 'user' | 'model';
-  content: string;
-  timestamp: number;
-}
+// Conversation history (in-memory)
+const conversationStore = new Map<string, { role: string, content: string }[]>();
+const MAX_HISTORY = 10;
 
-const conversationStore = new Map<string, ConversationMessage[]>();
-const MAX_HISTORY = 10; // Keep last 10 messages
-
-// Dữ liệu tuyển sinh mẫu (Context cơ bản cho AI)
-const TUYEN_SINH_CONTEXT = `
+const SYSTEM_PROMPT = `
 BẠN LÀ TRỢ LÝ AI TƯ VẤN TUYỂN SINH CỦA CÔNG AN TỈNH CAO BẰNG - PHÒNG TỔ CHỨC CÁN BỘ.
 
 THÔNG TIN TUYỂN SINH NĂM 2026:
 
 1. ĐIỀU KIỆN DỰ TUYỂN:
-- Bám sát quy định của Bộ Công an và Hướng dẫn của Công an tỉnh Cao Bằng.
-- Độ tuổi: Từ 18 đến 22 tuổi (tính đến năm dự tuyển). Cán bộ, chiến sĩ nghĩa vụ hoặc xuất ngũ có thể cao hơn.
+- Độ tuổi: Từ 18 đến 22 tuổi. Cán bộ, chiến sĩ nghĩa vụ hoặc xuất ngũ có thể cao hơn.
 - Tốt nghiệp THPT hoặc tương đương.
-- Thường trú tại tỉnh Cao Bằng hoặc theo quy định phân vùng tuyển sinh.
-- Tiêu chuẩn chính trị, sức khỏe khắt khe theo quy định riêng của ngành. Chiều cao: Nam >= 1.64m, Nữ >= 1.58m (trừ một số dân tộc thiểu số áp dụng tiêu chuẩn thấp hơn đôi chút).
+- Thường trú tại tỉnh Cao Bằng.
+- Chiều cao: Nam >= 1.64m, Nữ >= 1.58m.
 
-2. CÁC TRƯỜNG ĐÀO TẠO VÀ CHỈ TIÊU:
-- Các trường ĐH, HV CAND: Học viện ANND, Học viện CSND, ĐH PCCC, ĐH Kỹ thuật - Hậu cần CAND...
-- Chỉ tiêu: Được phân bổ cụ thể theo từng năm, từng đối tượng nam/nữ, dân tộc.
+2. CÁC TRƯỜNG: Học viện ANND, Học viện CSND, ĐH PCCC, ĐH Kỹ thuật - Hậu cần CAND...
 
-3. HẠN NỘP HỒ SƠ:
-- Vui lòng theo dõi thông báo mới nhất trên cổng thông tin hoặc tại trụ sở Công an các huyện/thành phố, Công an xã nơi cư trú để biết hạn nộp hồ sơ đăng ký sơ tuyển trực tiếp.
+3. CHẾ ĐỘ: Miễn học phí, bao ăn ở, phụ cấp sinh hoạt, BHYT.
 
-4. CHẾ ĐỘ:
-- Học phí: Miễn phí hoàn toàn.
-- Chế độ đãi ngộ: Được bao ăn, ở, mặc; được hưởng phụ cấp sinh hoạt, BHYT.
-- Sau tốt nghiệp: Công an tỉnh Cao Bằng hoặc Bộ Công an sẽ phân công công tác dựa trên kết quả học tập và nhu cầu thực tế.
+4. LIÊN HỆ: Phòng Tổ chức cán bộ - Công an tỉnh Cao Bằng.
 
-9. LIÊN HỆ:
-- Đơn vị: Phòng Tổ chức cán bộ - Công an tỉnh Cao Bằng.
-- Các thí sinh cần đến trực tiếp Công an xã/phường/thị trấn hoặc Công an huyện/thành phố nơi cư trú để được hướng dẫn chi tiết sơ tuyển.
-
-10. NGHỀ NGHIỆP SAU TỐT NGHIỆP:
-- Được bố trí công tác tại các đơn vị thuộc lực lượng Công an nhân dân
-- Hưởng lương và phụ cấp theo quy định
-- Có cơ hội thăng tiến trong ngành
-- Được đào tạo nâng cao chuyên môn nghiệp vụ
-
-HƯỚNG DẪN TRẢ LỜI:
-- Luôn lịch sự, thân thiện và chuyên nghiệp
-- Trả lời ngắn gọn, súc tích, dễ hiểu
-- Nếu không biết thông tin, hãy khuyên họ liên hệ hotline
-- Khuyến khích thí sinh đăng ký sớm
+QUY TẮC TRẢ LỜI:
+- Lịch sự, thân thiện, ngắn gọn
 - Luôn trả lời bằng tiếng Việt
-- NHỚ NGỮ CẢNH: Khi người dùng hỏi tiếp theo, hãy nhớ và tham chiếu đến câu hỏi/câu trả lời trước đó để trả lời chính xác
-- Ví dụ: Nếu người dùng hỏi "cách tính điểm năm 2026" rồi hỏi tiếp "còn năm 2025 thì sao", hãy hiểu là họ đang so sánh cách tính điểm giữa 2 năm
-- Nếu người dùng nói "năm nay" thì hiểu là năm 2026, "năm sau" là 2027, "năm trước" là 2025
-- KHÔNG DÙNG LATEX: Không dùng $$ hay $ để viết công thức toán học. Viết công thức bằng text thuần túy, dễ đọc.
-- Ví dụ cách viết công thức: "ĐXT = (M1+M2+M3) x 2/5 + BTBCA x 3/5 + Điểm ưu tiên" thay vì dùng $$\n- Dùng bullet points (-) và số thứ tự (1., 2., 3.) để trình bày rõ ràng
-- Bôi đậm các từ khóa quan trọng bằng cách để trong **dấu sao**
-- Dùng emoji phù hợp để minh họa: 📌 cho thông tin quan trọng, ✅ cho điều kiện, 💡 cho lưu ý, 🎯 cho mục tiêu
-`
-
-// Helper functions for conversation history
-function getConversationHistory(sessionId: string) {
-  return conversationStore.get(sessionId) || [];
-}
-
-function addToHistory(sessionId: string, role: 'user' | 'model', content: string) {
-  const history = getConversationHistory(sessionId);
-  history.push({
-    role,
-    content,
-    timestamp: Date.now(),
-  });
-
-  // Keep only last MAX_HISTORY messages
-  if (history.length > MAX_HISTORY) {
-    history.shift();
-  }
-
-  conversationStore.set(sessionId, history);
-}
-
-function buildConversationContext(history: any[]) {
-  if (history.length === 0) return '';
-
-  let context = '\n\nLỊCH SỬ CUỘC TRÒ CHUYỆN GẦN ĐÂY:\n';
-  history.forEach((msg, index) => {
-    const prefix = msg.role === 'user' ? 'Thí sinh' : 'Trợ lý AI';
-    context += `[${index + 1}] ${prefix}: ${msg.content.substring(0, 200)}${msg.content.length > 200 ? '...' : ''}\n`;
-  });
-  context += '\nHãy dựa vào lịch sử trên để trả lời câu hỏi tiếp theo một cách liên tục và chính xác.\n';
-
-  return context;
-}
+- KHÔNG dùng LaTeX ($$), viết text thuần
+- Dùng emoji: 📌 thông tin quan trọng, ✅ điều kiện, 💡 lưu ý
+`;
 
 export async function POST(req: NextRequest) {
+  const startTime = Date.now();
+
   try {
-    // Basic IP tracking for Rate Limiting
-    const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
+    // Rate limiting
+    const ip = req.headers.get('x-forwarded-for') || 'unknown';
     const now = Date.now();
     const userStatus = rateLimitMap.get(ip);
 
     if (userStatus && now < userStatus.resetTime) {
       if (userStatus.count >= LIMIT) {
         return NextResponse.json({
-          response: 'Bạn đã hỏi quá nhanh. Vui lòng đợi 1 phút để tiếp tục trò chuyện!',
+          response: 'Bạn đã hỏi quá nhanh. Vui lòng đợi 1 phút!',
           sessionId: null
         }, { status: 429 });
       }
@@ -123,91 +58,87 @@ export async function POST(req: NextRequest) {
       rateLimitMap.set(ip, { count: 1, resetTime: now + WINDOW_MS });
     }
 
-    const { message, sessionId: clientSessionId } = await req.json()
+    const { message, sessionId: clientSessionId } = await req.json();
 
     if (!message) {
-      return NextResponse.json({ error: 'Thiếu nội dung tin nhắn' }, { status: 400 })
+      return NextResponse.json({ error: 'Thiếu nội dung tin nhắn' }, { status: 400 });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return NextResponse.json({
-        response: 'Lỗi: Hệ thống chưa có API Key.',
+        response: 'Lỗi: Hệ thống chưa có API Key. Vui lòng cấu hình GEMINI_API_KEY.',
         sessionId: null
-      }, { status: 200 })
+      });
     }
 
-    // Get or create session ID
     const sessionId = clientSessionId || `session_${ip}_${Date.now()}`;
 
     // Get conversation history
-    const history = getConversationHistory(sessionId);
+    const history = conversationStore.get(sessionId) || [];
+    history.push({ role: 'user', content: message });
+    if (history.length > MAX_HISTORY) history.shift();
+    conversationStore.set(sessionId, history);
 
-    // Add user message to history
-    addToHistory(sessionId, 'user', message);
-
-    // 1. Search knowledge base with timeout (don't block if slow)
-    let ragContext = '';
-    try {
-      const ragPromise = (async () => {
-        const store = getVectorStore(apiKey);
-        return await store.search(message, 3);
-      })();
-
-      // Give RAG max 3 seconds, skip if too slow
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('RAG timeout')), 3000)
-      );
-
-      const searchResults = await Promise.race([ragPromise, timeoutPromise]);
-
-      if (searchResults.length > 0) {
-        ragContext = '\n\nTHÔNG TIN CHI TIẾT TỪ TÀI LIỆU:\n' +
-          searchResults.map((r: any, i: number) =>
-            `[${i + 1}] Từ ${r.chunk.type === 'image' ? 'hình ảnh' : 'tài liệu'} "${r.chunk.metadata.filename}":\n${r.chunk.content.substring(0, 500)}...`
-          ).join('\n\n');
-      }
-    } catch (error: any) {
-      // RAG search failed or timed out - continue without it
-      console.log('RAG search skipped:', error?.message || 'unknown error');
+    // Build conversation context
+    let conversationContext = '';
+    if (history.length > 1) {
+      conversationContext = '\n\nLỊCH SỬ TRÒ CHUYỆN:\n' +
+        history.slice(0, -1).map((msg, i) =>
+          `${msg.role === 'user' ? 'Thí sinh' : 'AI'}: ${msg.content.substring(0, 150)}`
+        ).join('\n') + '\n';
     }
 
-    // 2. Build conversation context from history
-    const conversationContext = buildConversationContext(history);
+    // Build prompt
+    const prompt = `${SYSTEM_PROMPT}${conversationContext}\n\nCâu hỏi: ${message}\n\nTrả lời bằng tiếng Việt:`;
 
-    // 3. Khởi tạo Gemini
+    console.log(`[Chat] Starting Gemini call at +${Date.now() - startTime}ms`);
+
+    // Call Gemini with timeout
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash"
-    });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
-    // 4. Build complete prompt with all context
-    const prompt = `${TUYEN_SINH_CONTEXT}${ragContext}${conversationContext}\n\nCâu hỏi hiện tại của thí sinh: ${message}\n\nHãy trả lời dựa trên toàn bộ ngữ cảnh trên. Nếu câu hỏi liên quan đến câu hỏi trước, hãy nhắc lại thông tin đã nói và bổ sung thêm. Trả lời bằng tiếng Việt:`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 25000); // 25s timeout
 
-    // 5. Generate response
-    const result = await model.generateContent(prompt);
-    const aiResponse = await result.response;
-    const text = aiResponse.text();
+    try {
+      const result = await model.generateContent(prompt);
+      clearTimeout(timeout);
 
-    // 6. Add AI response to history
-    addToHistory(sessionId, 'model', text);
+      const response = await result.response;
+      const text = response.text();
 
-    return NextResponse.json({
-      response: text,
-      sessionId: sessionId
-    });
+      console.log(`[Chat] Gemini responded at +${Date.now() - startTime}ms`);
+
+      // Save AI response to history
+      history.push({ role: 'model', content: text });
+      if (history.length > MAX_HISTORY) history.shift();
+      conversationStore.set(sessionId, history);
+
+      return NextResponse.json({
+        response: text,
+        sessionId: sessionId,
+        _debug: { totalMs: Date.now() - startTime }
+      });
+    } catch (genError: any) {
+      clearTimeout(timeout);
+      console.error(`[Chat] Gemini error at +${Date.now() - startTime}ms:`, genError?.message);
+      throw genError;
+    }
 
   } catch (error: any) {
-    console.error('Lỗi chi tiết:', error?.message || error);
-    console.error('Stack:', error?.stack);
+    console.error('[Chat] Error:', error?.message || error);
 
-    const errorMsg = error?.message?.includes('API_KEY')
-      ? 'Lỗi API Key. Vui lòng kiểm tra lại cấu hình.'
-      : 'Xin lỗi, hệ thống đang bận hoặc có lỗi kết nối API. Bạn vui lòng thử lại sau giây lát.';
+    const errorMsg = error?.message?.includes('API_KEY') || error?.message?.includes('api key')
+      ? '❌ Lỗi API Key. Vui lòng kiểm tra GEMINI_API_KEY trong Vercel.'
+      : error?.message?.includes('abort') || error?.message?.includes('timeout')
+        ? '⏰ Hệ thống phản hồi chậm. Vui lòng thử lại.'
+        : `❌ Lỗi: ${error?.message?.substring(0, 100) || 'Không xác định'}`;
 
     return NextResponse.json({
       response: errorMsg,
-      sessionId: null
-    }, { status: 200 });
+      sessionId: null,
+      _debug: { error: error?.message, totalMs: Date.now() - startTime }
+    });
   }
 }
