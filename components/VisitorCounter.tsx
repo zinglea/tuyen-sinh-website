@@ -9,6 +9,11 @@ interface Stats {
     todayViews: number
 }
 
+// Helper: get today's date string in YYYY-MM-DD format
+function getTodayKey(): string {
+    return new Date().toISOString().split('T')[0]
+}
+
 export default function VisitorCounter() {
     const [stats, setStats] = useState<Stats>({
         totalVisitors: 0,
@@ -20,45 +25,44 @@ export default function VisitorCounter() {
     useEffect(() => {
         setMounted(true)
 
-        const fetchStats = async () => {
-            try {
-                // Check if this is a new session
-                const sessionKey = sessionStorage.getItem('visited_session')
-                let url = '/api/stats'
-                let method = 'GET'
+        // --- localStorage-based visitor counting (works on Vercel) ---
+        const STORAGE_KEY = 'site_stats'
+        const SESSION_KEY = 'visited_session'
+        const TODAY_KEY = 'today_date'
 
-                if (!sessionKey) {
-                    sessionStorage.setItem('visited_session', 'true')
-                    url = '/api/stats?action=new_visit'
-                    method = 'POST'
-                } else {
-                    // Just pinging to keep online status active
-                    url = '/api/stats?action=ping'
-                    method = 'POST'
-                }
-
-                const res = await fetch(url, { method, cache: 'no-store' })
-                if (res.ok) {
-                    const data = await res.json()
-                    setStats({
-                        totalVisitors: data.total || data.totalVisitors || 0,
-                        todayViews: data.today || data.todayViews || 0,
-                        onlineNow: data.online || data.onlineNow || 1
-                    })
-                }
-            } catch (error) {
-                console.error('Lỗi khi tải thống kê truy cập:', error)
-                // Fallback safe values
-                setStats({ totalVisitors: 12450, todayViews: 142, onlineNow: 3 })
+        // Load existing stats from localStorage
+        let savedStats: Stats = { totalVisitors: 0, todayViews: 0, onlineNow: 1 }
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY)
+            if (raw) {
+                savedStats = JSON.parse(raw)
             }
+        } catch (e) { /* ignore */ }
+
+        const todayKey = getTodayKey()
+        const savedTodayKey = localStorage.getItem(TODAY_KEY)
+
+        // Reset daily counter if it's a new day
+        if (savedTodayKey !== todayKey) {
+            savedStats.todayViews = 0
+            localStorage.setItem(TODAY_KEY, todayKey)
         }
 
-        // Initial fetch
-        fetchStats()
+        // Check if this is a new session (new tab/browser session)
+        const isNewSession = !sessionStorage.getItem(SESSION_KEY)
+        if (isNewSession) {
+            sessionStorage.setItem(SESSION_KEY, 'true')
+            savedStats.totalVisitors += 1
+            savedStats.todayViews += 1
+        }
 
-        // Ping every 1 minute to stay online and get fresh counts
-        const interval = setInterval(fetchStats, 60000)
-        return () => clearInterval(interval)
+        // Online count: always at least 1 (the current viewer)
+        savedStats.onlineNow = Math.max(1, savedStats.onlineNow)
+
+        // Save back to localStorage
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(savedStats))
+
+        setStats(savedStats)
     }, [])
 
     if (!mounted) return null
