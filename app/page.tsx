@@ -9,7 +9,9 @@ import Header from '@/components/Header'
 export const dynamic = 'force-dynamic'
 
 export default async function Home() {
-  const newsData = await getAllNews()
+  const allData = await getAllNews()
+  // Filter out raw documents so they don't appear in the main News section
+  const newsData = allData.filter(article => article.contentType !== 'raw_document')
   const topNews = newsData.slice(0, 5)
 
   return (

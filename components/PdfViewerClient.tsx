@@ -4,8 +4,14 @@ import { useEffect, useState } from 'react';
 export default function PdfViewerClient({ fileUrl }: { fileUrl: string }) {
     const [blobUrl, setBlobUrl] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
+    const [isMobile, setIsMobile] = useState(false);
 
     useEffect(() => {
+        // Detect mobile browsers
+        if (typeof window !== 'undefined') {
+            setIsMobile(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+        }
+
         let isMounted = true;
 
         async function fetchPdf() {
@@ -50,7 +56,26 @@ export default function PdfViewerClient({ fileUrl }: { fileUrl: string }) {
     if (!blobUrl) {
         return (
             <div className="w-full h-[85vh] flex items-center justify-center bg-red-50 rounded-2xl text-red-500 border-2 border-dashed border-red-200 font-semibold">
-                Lỗi tải tài liệu. Vui lòng tải về máy.
+                Lỗi tải tài liệu. Vui lòng thử lại.
+            </div>
+        );
+    }
+
+    if (isMobile) {
+        return (
+            <div className="w-full py-16 px-6 flex flex-col items-center justify-center bg-blue-50 rounded-2xl border-2 border-dashed border-blue-200 text-center">
+                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                    <span className="text-2xl">📱</span>
+                </div>
+                <h3 className="text-xl font-bold text-slate-800 mb-2">Chế độ xem trên thiết bị di động</h3>
+                <p className="text-slate-600 mb-6 max-w-sm">
+                    Trình duyệt trên điện thoại của bạn không hỗ trợ nhúng thẻ PDF nội bộ. Hệ thống đã xử lý và chuẩn bị sẵn tệp an toàn cho điện thoại.
+                </p>
+                <div className="flex flex-col gap-3 w-full sm:w-auto">
+                    <a href={blobUrl} target="_blank" rel="noopener noreferrer" className="px-6 py-3 bg-blue-600 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all">
+                        👀 Xem tài liệu toàn màn hình
+                    </a>
+                </div>
             </div>
         );
     }
