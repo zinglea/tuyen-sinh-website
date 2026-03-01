@@ -1,6 +1,56 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { NextRequest, NextResponse } from 'next/server'
 import { getVectorStore } from '@/utils/rag'
+import { getApiKeyWithFallback, isSecureStorageInitialized } from '@/utils/secureStorage'
+
+// Polyfill for DOMMatrix in server environment
+if (typeof globalThis.DOMMatrix === 'undefined') {
+  globalThis.DOMMatrix = class DOMMatrix {
+    constructor() {
+      this.a = 1; this.b = 0; this.c = 0; this.d = 1; this.e = 0; this.f = 0;
+    }
+    a: number; b: number; c: number; d: number; e: number; f: number;
+  } as any;
+}
+
+// Polyfill for ImageData in server environment
+if (typeof globalThis.ImageData === 'undefined') {
+  globalThis.ImageData = class ImageData {
+    constructor() {}
+  } as any;
+}
+
+// Polyfill for Path2D in server environment
+if (typeof globalThis.Path2D === 'undefined') {
+  globalThis.Path2D = class Path2D {
+    constructor() {}
+  } as any;
+}
+
+// Get API key with multiple fallback strategies
+function getApiKey(): string | null {
+  // Priority 1: Environment variable (for production deployment)
+  const envKey = process.env.GEMINI_API_KEY;
+  if (envKey && envKey.length > 10) {
+    console.log('Using API key from environment variable');
+    return envKey;
+  }
+
+  // Priority 2: Secure storage (for encrypted local/secure deployment)
+  if (isSecureStorageInitialized()) {
+    const masterPassword = process.env.MASTER_PASSWORD;
+    if (masterPassword) {
+      const storedKey = getApiKeyWithFallback(masterPassword);
+      if (storedKey) {
+        console.log('Using API key from secure storage');
+        return storedKey;
+      }
+    }
+  }
+
+  console.warn('No valid API key found in environment or secure storage');
+  return null;
+}
 
 // Simple In-Memory Rate Limiter
 const rateLimitMap = new Map<string, { count: number, resetTime: number }>();
