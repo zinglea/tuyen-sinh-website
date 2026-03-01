@@ -165,7 +165,7 @@ export async function POST(req: NextRequest) {
     // 3. Khởi tạo Gemini
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
-      model: "gemini-flash-latest"
+      model: "gemini-2.0-flash"
     });
 
     // 4. Build complete prompt with all context
@@ -185,11 +185,15 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('Lỗi chi tiết:', error);
+    console.error('Lỗi chi tiết:', error?.message || error);
+    console.error('Stack:', error?.stack);
 
-    // Trả về thông báo thân thiện cho người dùng thay vì crash
+    const errorMsg = error?.message?.includes('API_KEY')
+      ? 'Lỗi API Key. Vui lòng kiểm tra lại cấu hình.'
+      : 'Xin lỗi, hệ thống đang bận hoặc có lỗi kết nối API. Bạn vui lòng thử lại sau giây lát.';
+
     return NextResponse.json({
-      response: 'Xin lỗi, hệ thống đang bận hoặc có lỗi kết nối API. Bạn vui lòng thử lại sau giây lát.',
+      response: errorMsg,
       sessionId: null
     }, { status: 200 });
   }

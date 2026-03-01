@@ -23,11 +23,11 @@ module.exports = {
         police: {
           start: '#00c6ff', // Lighter blue for gradient start
           end: '#0072ff',   // Deeper blue for gradient end
-          light: '#00c6ff', 
-          DEFAULT: '#0072ff', 
-          dark: '#005bbd', 
-          accent: '#facc15', 
-          nav: '#005bbd', 
+          light: '#00c6ff',
+          DEFAULT: '#0072ff',
+          dark: '#005bbd',
+          accent: '#facc15',
+          nav: '#005bbd',
         },
       },
       animation: {

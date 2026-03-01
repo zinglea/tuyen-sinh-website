@@ -1,6 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Types
 export interface DocumentChunk {
@@ -24,16 +23,14 @@ export interface SearchResult {
 const DATA_RAG_DIR = path.join(process.cwd(), 'data', 'rag');
 const PROCESSED_DIR = path.join(DATA_RAG_DIR, 'processed');
 
-// Simple in-memory vector store using Gemini embeddings
+/**
+ * Simple keyword-based vector store
+ * Uses TF-IDF-like scoring instead of Gemini embeddings
+ * This avoids API calls and works within Vercel's serverless timeout
+ */
 class SimpleVectorStore {
   private chunks: DocumentChunk[] = [];
-  private embeddings: Map<string, number[]> = new Map();
-  private apiKey: string;
   private loaded = false;
-
-  constructor(apiKey: string) {
-    this.apiKey = apiKey;
-  }
 
   /**
    * Load pre-processed documents from data/rag/processed/
@@ -56,9 +53,7 @@ class SimpleVectorStore {
           const filePath = path.join(PROCESSED_DIR, file);
           const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
 
-          // Each processed file contains: id, filename, content, type, metadata
           if (data.content) {
-            // Split content into chunks for better search
             const contentChunks = splitIntoChunks(data.content, 1000, 200);
 
             contentChunks.forEach((chunkContent, index) => {
@@ -87,48 +82,58 @@ class SimpleVectorStore {
     }
   }
 
+  /**
+   * Keyword-based search (no API calls needed)
+   * Uses Vietnamese-aware word matching with TF-IDF-like scoring
+   */
   async search(query: string, topK: number = 5): Promise<SearchResult[]> {
     this.loadPreProcessedData();
 
     if (this.chunks.length === 0) return [];
 
-    const genAI = new GoogleGenerativeAI(this.apiKey);
-    const model = genAI.getGenerativeModel({ model: 'text-embedding-004' });
+    // Normalize and tokenize query
+    const queryTerms = tokenize(query);
 
-    try {
-      // Generate query embedding
-      const queryResult = await model.embedContent(query);
-      const queryEmbedding = queryResult.embedding.values;
+    if (queryTerms.length === 0) return [];
 
-      // Generate embeddings for chunks that don't have them yet (lazy loading)
-      const chunksToEmbed = this.chunks.filter(c => !this.embeddings.has(c.id));
+    // Score each chunk by keyword relevance
+    const scores = this.chunks.map(chunk => {
+      const chunkText = chunk.content.toLowerCase();
+      let score = 0;
 
-      for (const chunk of chunksToEmbed) {
-        try {
-          const result = await model.embedContent(chunk.content);
-          this.embeddings.set(chunk.id, result.embedding.values);
-        } catch (error) {
-          console.error(`Error embedding chunk ${chunk.id}:`, error);
+      // Exact phrase match (highest weight)
+      const queryLower = query.toLowerCase();
+      if (chunkText.includes(queryLower)) {
+        score += 10;
+      }
+
+      // Individual term matches
+      for (const term of queryTerms) {
+        if (chunkText.includes(term)) {
+          // Count occurrences
+          const regex = new RegExp(escapeRegex(term), 'gi');
+          const matches = chunkText.match(regex);
+          const count = matches ? matches.length : 0;
+
+          // TF-like scoring: diminishing returns for repeated terms
+          score += Math.log2(1 + count);
         }
       }
 
-      // Calculate cosine similarity
-      const scores = this.chunks.map(chunk => {
-        const embedding = this.embeddings.get(chunk.id);
-        if (!embedding) return { chunk, score: 0 };
+      // Bonus for matching multiple distinct terms
+      const matchedTerms = queryTerms.filter(term => chunkText.includes(term));
+      if (matchedTerms.length > 1) {
+        score *= (1 + matchedTerms.length / queryTerms.length);
+      }
 
-        const score = cosineSimilarity(queryEmbedding, embedding);
-        return { chunk, score };
-      });
+      return { chunk, score };
+    });
 
-      // Sort by score and return top K
-      return scores
-        .sort((a, b) => b.score - a.score)
-        .slice(0, topK);
-    } catch (error) {
-      console.error('Error searching:', error);
-      return [];
-    }
+    // Sort by score and return top K with score > 0
+    return scores
+      .filter(s => s.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, topK);
   }
 
   getStats() {
@@ -138,6 +143,20 @@ class SimpleVectorStore {
       totalDocuments: new Set(this.chunks.map(c => c.metadata.filename)).size,
     };
   }
+}
+
+// Tokenize Vietnamese text into search terms
+function tokenize(text: string): string[] {
+  return text
+    .toLowerCase()
+    .split(/[\s,.\-;:!?()[\]{}'"\/\\]+/)
+    .filter(word => word.length >= 2)     // Skip single chars
+    .filter((word, index, self) => self.indexOf(word) === index); // Deduplicate
+}
+
+// Escape special regex characters
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 // Helper: Split text into chunks
@@ -156,27 +175,12 @@ function splitIntoChunks(text: string, chunkSize: number, overlap: number): stri
   return chunks.filter(chunk => chunk.trim().length > 0);
 }
 
-// Cosine similarity calculation
-function cosineSimilarity(a: number[], b: number[]): number {
-  let dotProduct = 0;
-  let normA = 0;
-  let normB = 0;
-
-  for (let i = 0; i < a.length; i++) {
-    dotProduct += a[i] * b[i];
-    normA += a[i] * a[i];
-    normB += b[i] * b[i];
-  }
-
-  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-}
-
 // Export singleton instance
 let vectorStore: SimpleVectorStore | null = null;
 
 export function getVectorStore(apiKey: string): SimpleVectorStore {
   if (!vectorStore) {
-    vectorStore = new SimpleVectorStore(apiKey);
+    vectorStore = new SimpleVectorStore();
   }
   return vectorStore;
 }
