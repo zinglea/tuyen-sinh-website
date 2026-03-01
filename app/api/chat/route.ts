@@ -1,7 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { NextRequest, NextResponse } from 'next/server'
 import { getVectorStore } from '@/utils/rag'
-import { getApiKeyWithFallback, isSecureStorageInitialized } from '@/utils/secureStorage'
 
 // Polyfill for DOMMatrix in server environment
 if (typeof globalThis.DOMMatrix === 'undefined') {
@@ -27,28 +26,15 @@ if (typeof globalThis.Path2D === 'undefined') {
   } as any;
 }
 
-// Get API key with multiple fallback strategies
+// Get API key from environment variable (production deployment)
 function getApiKey(): string | null {
-  // Priority 1: Environment variable (for production deployment)
   const envKey = process.env.GEMINI_API_KEY;
   if (envKey && envKey.length > 10) {
     console.log('Using API key from environment variable');
     return envKey;
   }
 
-  // Priority 2: Secure storage (for encrypted local/secure deployment)
-  if (isSecureStorageInitialized()) {
-    const masterPassword = process.env.MASTER_PASSWORD;
-    if (masterPassword) {
-      const storedKey = getApiKeyWithFallback(masterPassword);
-      if (storedKey) {
-        console.log('Using API key from secure storage');
-        return storedKey;
-      }
-    }
-  }
-
-  console.warn('No valid API key found in environment or secure storage');
+  console.warn('No valid API key found in environment');
   return null;
 }
 
