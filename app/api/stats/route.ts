@@ -1,63 +1,74 @@
 import { NextResponse } from 'next/server'
 import fs from 'fs'
 import path from 'path'
+import os from 'os'
 
-const DB_DIR = path.join(process.cwd(), 'data')
+// Use /tmp on Vercel (writable), fallback to data/ locally
+const isVercel = process.env.VERCEL === '1'
+const DB_DIR = isVercel ? os.tmpdir() : path.join(process.cwd(), 'data')
 const DB_FILE = path.join(DB_DIR, 'stats.json')
 
 interface StatsData {
     total: number;
     todayCount: number;
     lastDate: string;
-    firstVisit: number;
-    onlineUsers: number[]; // Array of timestamps
+    onlineUsers: { [sessionId: string]: number }; // sessionId -> last ping timestamp
 }
 
-// Ensure the directory and file exist
-if (!fs.existsSync(DB_DIR)) {
-    fs.mkdirSync(DB_DIR, { recursive: true })
+const SEED_DATA: StatsData = {
+    total: 0,
+    todayCount: 0,
+    lastDate: new Date().toDateString(),
+    onlineUsers: {}
 }
 
-if (!fs.existsSync(DB_FILE)) {
-    // Initial seeded data
-    const initialData: StatsData = {
-        total: 12450,
-        todayCount: 142,
-        lastDate: new Date().toDateString(),
-        firstVisit: Date.now(),
-        onlineUsers: []
+function readStats(): StatsData {
+    try {
+        if (fs.existsSync(DB_FILE)) {
+            const raw = fs.readFileSync(DB_FILE, 'utf-8')
+            return JSON.parse(raw)
+        }
+    } catch (e) { /* ignore */ }
+    return { ...SEED_DATA }
+}
+
+function writeStats(data: StatsData): void {
+    try {
+        if (!fs.existsSync(DB_DIR)) {
+            fs.mkdirSync(DB_DIR, { recursive: true })
+        }
+        fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2))
+    } catch (e) {
+        console.error('Failed to write stats:', e)
     }
-    fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2))
 }
 
 export async function GET() {
-    try {
-        const dataStr = fs.readFileSync(DB_FILE, 'utf-8')
-        const data: StatsData = JSON.parse(dataStr)
+    const data = readStats()
 
-        // Clean up online users (older than 5 minutes)
-        const fiveMinutesAgo = Date.now() - 5 * 60 * 1000
-        const activeUsersCount = data.onlineUsers.filter(ts => ts > fiveMinutesAgo).length
-
-        return NextResponse.json({
-            totalVisitors: data.total,
-            todayViews: data.todayCount,
-            onlineNow: Math.max(1, activeUsersCount) // At least 1 (the requester)
-        })
-    } catch (e) {
-        return NextResponse.json({ error: 'Cannot read stats' }, { status: 500 })
+    // Clean up online users (older than 5 minutes)
+    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000
+    let activeCount = 0
+    for (const sid in data.onlineUsers) {
+        if (data.onlineUsers[sid] > fiveMinutesAgo) {
+            activeCount++
+        }
     }
+
+    return NextResponse.json({
+        totalVisitors: data.total,
+        todayViews: data.todayCount,
+        onlineNow: Math.max(1, activeCount)
+    })
 }
 
 export async function POST(request: Request) {
     try {
         const { searchParams } = new URL(request.url)
         const action = searchParams.get('action') // 'new_visit' or 'ping'
-        const sessionId = searchParams.get('session') || Date.now().toString()
+        const sessionId = searchParams.get('session') || 'anon-' + Date.now()
 
-        const dataStr = fs.readFileSync(DB_FILE, 'utf-8')
-        const data: StatsData = JSON.parse(dataStr)
-
+        const data = readStats()
         const today = new Date().toDateString()
         const now = Date.now()
 
@@ -72,17 +83,27 @@ export async function POST(request: Request) {
             data.todayCount += 1
         }
 
-        // Add or update timestamp for this pseudo-session using the end of array
-        // In a real DB we'd use IP or distinct session IDs. Here we just add a timestamp and keep array small.
-        data.onlineUsers.push(now)
+        // Update online timestamp for this session
+        data.onlineUsers[sessionId] = now
 
-        // Prune old timestamps to keep file small (5 min threshold)
+        // Prune sessions older than 5 minutes
         const fiveMinutesAgo = now - 5 * 60 * 1000
-        data.onlineUsers = data.onlineUsers.filter(ts => ts > fiveMinutesAgo)
+        for (const sid in data.onlineUsers) {
+            if (data.onlineUsers[sid] <= fiveMinutesAgo) {
+                delete data.onlineUsers[sid]
+            }
+        }
 
-        fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2))
+        writeStats(data)
 
-        return NextResponse.json({ success: true, online: data.onlineUsers.length, total: data.total, today: data.todayCount })
+        const onlineCount = Object.keys(data.onlineUsers).length
+
+        return NextResponse.json({
+            success: true,
+            totalVisitors: data.total,
+            todayViews: data.todayCount,
+            onlineNow: Math.max(1, onlineCount)
+        })
 
     } catch (e) {
         return NextResponse.json({ error: 'Cannot update stats' }, { status: 500 })

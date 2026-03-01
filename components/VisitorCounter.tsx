@@ -9,11 +9,6 @@ interface Stats {
     todayViews: number
 }
 
-// Helper: get today's date string in YYYY-MM-DD format
-function getTodayKey(): string {
-    return new Date().toISOString().split('T')[0]
-}
-
 export default function VisitorCounter() {
     const [stats, setStats] = useState<Stats>({
         totalVisitors: 0,
@@ -25,44 +20,46 @@ export default function VisitorCounter() {
     useEffect(() => {
         setMounted(true)
 
-        // --- localStorage-based visitor counting (works on Vercel) ---
-        const STORAGE_KEY = 'site_stats'
-        const SESSION_KEY = 'visited_session'
-        const TODAY_KEY = 'today_date'
+        // Generate a unique session ID per browser tab
+        let sessionId = sessionStorage.getItem('counter_session_id')
+        if (!sessionId) {
+            sessionId = 'sid-' + Math.random().toString(36).substring(2, 10) + '-' + Date.now()
+            sessionStorage.setItem('counter_session_id', sessionId)
+        }
 
-        // Load existing stats from localStorage
-        let savedStats: Stats = { totalVisitors: 0, todayViews: 0, onlineNow: 1 }
-        try {
-            const raw = localStorage.getItem(STORAGE_KEY)
-            if (raw) {
-                savedStats = JSON.parse(raw)
+        const isNewVisit = !sessionStorage.getItem('counted_visit')
+
+        const fetchStats = async () => {
+            try {
+                const action = isNewVisit ? 'new_visit' : 'ping'
+                if (isNewVisit) {
+                    sessionStorage.setItem('counted_visit', 'true')
+                }
+
+                const res = await fetch(`/api/stats?action=${action}&session=${sessionId}`, {
+                    method: 'POST',
+                    cache: 'no-store'
+                })
+
+                if (res.ok) {
+                    const data = await res.json()
+                    setStats({
+                        totalVisitors: data.totalVisitors || 0,
+                        todayViews: data.todayViews || 0,
+                        onlineNow: data.onlineNow || 1
+                    })
+                }
+            } catch (error) {
+                console.error('Lỗi khi tải thống kê truy cập:', error)
             }
-        } catch (e) { /* ignore */ }
-
-        const todayKey = getTodayKey()
-        const savedTodayKey = localStorage.getItem(TODAY_KEY)
-
-        // Reset daily counter if it's a new day
-        if (savedTodayKey !== todayKey) {
-            savedStats.todayViews = 0
-            localStorage.setItem(TODAY_KEY, todayKey)
         }
 
-        // Check if this is a new session (new tab/browser session)
-        const isNewSession = !sessionStorage.getItem(SESSION_KEY)
-        if (isNewSession) {
-            sessionStorage.setItem(SESSION_KEY, 'true')
-            savedStats.totalVisitors += 1
-            savedStats.todayViews += 1
-        }
+        // Initial fetch
+        fetchStats()
 
-        // Online count: always at least 1 (the current viewer)
-        savedStats.onlineNow = Math.max(1, savedStats.onlineNow)
-
-        // Save back to localStorage
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(savedStats))
-
-        setStats(savedStats)
+        // Ping every 1 minute to stay online and get fresh counts
+        const interval = setInterval(fetchStats, 60000)
+        return () => clearInterval(interval)
     }, [])
 
     if (!mounted) return null
