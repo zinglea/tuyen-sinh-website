@@ -158,7 +158,7 @@ export default async function Home() {
                 <img src="/logo.png" alt="Logo" className="w-16 h-16 object-contain" />
               </div>
               <div>
-                <h3 className="font-extrabold text-xl uppercase tracking-widest text-white drop-shadow">Trang Web Tuyển Sinh</h3>
+                <h3 className="font-extrabold text-xl uppercase tracking-widest text-white drop-shadow">WEBSITE Tuyển Sinh</h3>
                 <h4 className="font-semibold text-police-accent text-sm tracking-wider uppercase mt-1">Phòng Tổ chức cán bộ - Công an tỉnh Cao Bằng</h4>
               </div>
             </div>

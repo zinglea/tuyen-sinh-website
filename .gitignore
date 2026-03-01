@@ -36,4 +36,7 @@ yarn-error.log*
 next-env.d.ts
 
 # Knowledge base - sensitive data (chỉ admin có quyền truy cập)
+# /knowledge-base/ gốc đã được mã hóa vào .secure/, không cần commit thư mục gốc
 /knowledge-base/
+
+# misc
