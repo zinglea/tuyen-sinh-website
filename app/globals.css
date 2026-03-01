@@ -114,7 +114,8 @@ nextjs-portal {
 /* Video container responsive */
 .docx-content .video-container {
   position: relative;
-  padding-bottom: 56.25%; /* 16:9 */
+  padding-bottom: 56.25%;
+  /* 16:9 */
   height: 0;
   overflow: hidden;
   max-width: 100%;
@@ -139,6 +140,278 @@ nextjs-portal {
   border-radius: 12px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
   margin: 1.5em 0;
+}
+
+/* ============================
+   PPTX Presentation Styles
+   ============================ */
+
+.pptx-presentation {
+  margin: 2rem 0;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  background: #1a1a2e;
+  outline: none;
+}
+
+.pptx-nav-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #0f0f23, #1a1a3e);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pptx-slide-info {
+  color: #a0aec0;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pptx-slide-info strong {
+  color: #63b3ed;
+}
+
+.pptx-nav-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pptx-nav-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+  padding: 6px 16px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pptx-nav-btn:hover:not(:disabled) {
+  background: rgba(99, 179, 237, 0.2);
+  border-color: rgba(99, 179, 237, 0.4);
+  color: #63b3ed;
+}
+
+.pptx-nav-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.pptx-slide-counter {
+  color: #a0aec0;
+  font-size: 0.85rem;
+  font-weight: 500;
+  min-width: 80px;
+  text-align: center;
+}
+
+.pptx-slides-wrapper {
+  position: relative;
+  min-height: 200px;
+}
+
+.pptx-slide {
+  display: none;
+  padding: 28px 32px 36px;
+  animation: pptxFadeIn 0.35s ease-out;
+}
+
+.pptx-slide-active {
+  display: block;
+}
+
+@keyframes pptxFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.pptx-slide-number {
+  color: rgba(255, 255, 255, 0.25);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 16px;
+}
+
+.pptx-slide-content {
+  color: #e2e8f0;
+}
+
+/* PPTX Grid Layout for Text + Media */
+.pptx-grid-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .pptx-grid-layout {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .pptx-grid-text {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .pptx-grid-media {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.pptx-title {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: #fff;
+  margin-bottom: 16px;
+  line-height: 1.3;
+  background: linear-gradient(135deg, #ffffff, #63b3ed);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.pptx-subtitle {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #e2e8f0;
+  margin-bottom: 14px;
+  line-height: 1.4;
+}
+
+.pptx-text {
+  font-size: 1rem;
+  line-height: 1.75;
+  color: #cbd5e0;
+  margin-bottom: 10px;
+}
+
+.pptx-bullet {
+  font-size: 1rem;
+  line-height: 1.75;
+  color: #cbd5e0;
+  margin-bottom: 6px;
+  padding-left: 16px;
+  position: relative;
+  list-style: none;
+}
+
+.pptx-bullet::before {
+  content: '▸';
+  position: absolute;
+  left: 0;
+  color: #63b3ed;
+  font-weight: bold;
+}
+
+.pptx-image-wrapper {
+  margin: 16px 0;
+  text-align: center;
+}
+
+.pptx-image-wrapper img {
+  max-width: 100%;
+  max-height: 500px;
+  height: auto;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  object-fit: contain;
+}
+
+.pptx-video-container {
+  position: relative;
+  padding-bottom: 56.25%;
+  height: 0;
+  overflow: hidden;
+  margin: 16px 0;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.pptx-video-container iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 10px;
+}
+
+.pptx-video-direct {
+  margin: 16px 0;
+}
+
+.pptx-video-direct video {
+  width: 100%;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  background: #000;
+}
+
+.pptx-audio-container {
+  margin: 16px 0;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.pptx-audio-container audio {
+  width: 100%;
+}
+
+.pptx-media-link {
+  margin: 16px 0;
+  padding: 14px 20px;
+  background: rgba(99, 179, 237, 0.1);
+  border-radius: 10px;
+  text-align: center;
+  border: 1px solid rgba(99, 179, 237, 0.2);
+}
+
+.pptx-media-link a {
+  color: #63b3ed;
+  font-weight: 700;
+  text-decoration: none;
+  font-size: 1rem;
+}
+
+.pptx-media-link a:hover {
+  color: #90cdf4;
+  text-decoration: underline;
+}
+
+/* Content type badge in news list */
+.news-badge-pptx {
+  background: linear-gradient(135deg, #e53e3e, #dd6b20);
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 /* Links in article content */
@@ -175,5 +448,33 @@ nextjs-portal {
   .docx-content .video-container {
     margin: 1em 0;
     border-radius: 8px;
+  }
+
+  /* PPTX mobile responsive */
+  .pptx-presentation {
+    margin: 1rem 0;
+    border-radius: 10px;
+  }
+
+  .pptx-nav-bar {
+    padding: 8px 12px;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .pptx-slide {
+    padding: 16px 14px 24px;
+  }
+
+  .pptx-title {
+    font-size: 1.3rem;
+  }
+
+  .pptx-subtitle {
+    font-size: 1.1rem;
+  }
+
+  .pptx-image-wrapper img {
+    max-height: 300px;
   }
 }

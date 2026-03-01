@@ -35,6 +35,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: blob: https:",
+      "media-src 'self' data: blob: https:",
       "frame-src https://www.youtube.com https://youtube.com https://www.facebook.com https://web.facebook.com",
       "connect-src 'self' https://generativelanguage.googleapis.com",
     ].join('; ')

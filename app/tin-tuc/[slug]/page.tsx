@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { ArrowLeft, Calendar, GraduationCap, Eye, Share2 } from 'lucide-react'
 import { getNewsBySlug, getAllNews } from '@/utils/docxParser'
 import { notFound } from 'next/navigation'
+import PptxSlideNav from '@/components/PptxSlideNav'
 
 export const dynamic = 'force-dynamic'
 
@@ -65,11 +66,8 @@ export default async function NewsDetail({ params }: { params: Promise<{ slug: s
                             {article.title}
                         </h1>
 
-                        {/* Content */}
-                        <div
-                            className="prose prose-sm md:prose-lg prose-slate max-w-none docx-content"
-                            dangerouslySetInnerHTML={{ __html: article.contentHtml }}
-                        />
+                        {/* Content - uses PptxSlideNav for both docx and pptx to enable slide navigation */}
+                        <PptxSlideNav contentHtml={article.contentHtml} />
 
                         {/* Social share + CTA */}
                         <div className="mt-8 md:mt-12 pt-6 md:pt-8 border-t border-slate-200">

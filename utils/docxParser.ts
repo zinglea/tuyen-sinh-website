@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import mammoth from 'mammoth';
+import { parsePptx } from './pptxParser';
 
 
 const NEWS_DIR = path.join(process.cwd(), 'data/news');
@@ -15,12 +16,13 @@ export interface NewsArticle {
     contentHtml: string;
     image?: string;
     author?: string;
+    contentType?: 'docx' | 'pptx';
 }
 
 /**
- * Extract YouTube/video URLs from docx internal relationships (OLE embeds)
+ * Extract YouTube/video URLs from docx internal relationships (OLE embeds) or direct media files
  */
-function extractVideoUrlsFromDocx(filePath: string): string[] {
+async function extractVideoUrlsFromDocx(filePath: string): Promise<string[]> {
     const urls: string[] = [];
 
     try {
@@ -47,6 +49,21 @@ function extractVideoUrlsFromDocx(filePath: string): string[] {
                 if (!urls.includes(url)) {
                     urls.push(url);
                 }
+            }
+        }
+
+        // Also extract embedded local video files using JSZip
+        const JSZip = (await import('jszip')).default;
+        const zip = await JSZip.loadAsync(buffer);
+        const mediaFiles = Object.keys(zip.files).filter(name => name.startsWith('word/media/') && (name.toLowerCase().endsWith('.mp4') || name.toLowerCase().endsWith('.webm')));
+
+        for (const mediaPath of mediaFiles) {
+            const mediaFile = zip.file(mediaPath);
+            if (mediaFile) {
+                const mediaData = await mediaFile.async('base64');
+                const ext = path.extname(mediaPath).toLowerCase();
+                const mimeType = ext === '.webm' ? 'video/webm' : 'video/mp4';
+                urls.push(`data:${mimeType};base64,${mediaData}`);
             }
         }
     } catch (error) {
@@ -119,12 +136,13 @@ function videoUrlToEmbed(url: string): string {
         </div>`;
     }
 
-    // Direct MP4
-    if (url.endsWith('.mp4') || url.includes('.mp4')) {
+    // Direct MP4 or Base64 embedded video
+    if (url.endsWith('.mp4') || url.includes('.mp4') || url.startsWith('data:video/')) {
+        const mimeType = url.startsWith('data:video/webm') ? 'video/webm' : 'video/mp4';
         return `
-        <div class="video-container" style="max-width:100%;margin:1.5em 0;">
-            <video controls style="width:100%;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,0.15);">
-                <source src="${url}" type="video/mp4">
+        <div class="video-container" style="max-width:100%;margin:1.5em 0;height:auto;padding-bottom:0;">
+            <video controls style="width:100%;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,0.15);" preload="metadata">
+                <source src="${url}" type="${mimeType}">
                 Trình duyệt không hỗ trợ video.
             </video>
         </div>`;
@@ -147,24 +165,48 @@ function videoUrlToEmbed(url: string): string {
 function processVideoInHtml(html: string, videoUrls: string[]): string {
     if (videoUrls.length === 0) return html;
 
-    // Remove #Video: tags from HTML
-    html = html.replace(/<p[^>]*>.*?#[Vv]ideo:\s*https?:\/\/[^\s<]*.*?<\/p>/gi, '');
+    let remainingEmbeds: string[] = [];
 
-    // Generate video embeds HTML
-    const videoEmbedsHtml = videoUrls.map(url => videoUrlToEmbed(url)).join('\n');
+    for (const url of videoUrls) {
+        const embedHtml = videoUrlToEmbed(url);
 
-    // If the HTML has an OLE object thumbnail (usually an EMF image that's very small),
-    // replace it with the video embed. Otherwise append at the end.
-    // OLE thumbnails in mammoth are typically small base64 images
-    const oleImagePattern = /(<p[^>]*>)?\s*<img[^>]+src="data:image\/[^"]*"[^>]*>\s*(<\/p>)?/;
-    const oleMatch = html.match(oleImagePattern);
+        if (url.startsWith('data:video/')) {
+            remainingEmbeds.push(embedHtml);
+            continue;
+        }
 
-    if (oleMatch) {
-        // Replace the first OLE thumbnail with video embeds
-        html = html.replace(oleImagePattern, videoEmbedsHtml);
-    } else {
-        // Append video embeds at the end of content
-        html += '\n' + videoEmbedsHtml;
+        const escapedUrl = url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        let replaced = false;
+
+        // Pattern 1: <p> tag containing #Video: url
+        const pWithTag = new RegExp(`<p[^>]*>.*?#[Vv]ideo:\\s*(?:<a[^>]*>)?${escapedUrl}(?:<\\/a>)?.*?<\\/p>`, 'i');
+        if (pWithTag.test(html)) {
+            html = html.replace(pWithTag, embedHtml);
+            replaced = true;
+        } else {
+            // Pattern 2: <p> tag matching standalone url
+            const pWithUrl = new RegExp(`<p[^>]*>\\s*(?:<a[^>]*>)?${escapedUrl}(?:<\\/a>)?\\s*<\\/p>`, 'i');
+            if (pWithUrl.test(html)) {
+                html = html.replace(pWithUrl, embedHtml);
+                replaced = true;
+            }
+        }
+
+        if (!replaced) {
+            remainingEmbeds.push(embedHtml);
+        }
+    }
+
+    if (remainingEmbeds.length > 0) {
+        const remainingEmbedsHtml = remainingEmbeds.join('\n');
+        const oleImagePattern = /(<p[^>]*>)?\s*<img[^>]+src="data:image\/[^"]*"[^>]*>\s*(<\/p>)?/;
+        const oleMatch = html.match(oleImagePattern);
+
+        if (oleMatch) {
+            html = html.replace(oleImagePattern, remainingEmbedsHtml);
+        } else {
+            html += '\n' + remainingEmbedsHtml;
+        }
     }
 
     return html;
@@ -175,11 +217,14 @@ export async function getAllNews(): Promise<NewsArticle[]> {
         return [];
     }
 
-    const files = fs.readdirSync(NEWS_DIR).filter(file => file.endsWith('.docx') && !file.startsWith('~'));
+    const allFiles = fs.readdirSync(NEWS_DIR).filter(file => !file.startsWith('~'));
+    const docxFiles = allFiles.filter(file => file.endsWith('.docx'));
+    const pptxFiles = allFiles.filter(file => file.endsWith('.pptx'));
 
     const articles: NewsArticle[] = [];
 
-    for (const file of files) {
+    // Process DOCX files
+    for (const file of docxFiles) {
         const filePath = path.join(NEWS_DIR, file);
         const fileNameWithoutExt = path.basename(file, '.docx');
 
@@ -233,7 +278,10 @@ export async function getAllNews(): Promise<NewsArticle[]> {
                 }
             }
 
-            const cleanExcerptText = rawText.replace(/#Loaivb:.*|#Tieude:.*|#Tacgia:.*|#Ngay:.*|#Video:.*|#n[ộoiỉ]\s*dung:.*/gi, '').trim();
+            let cleanExcerptText = rawText.replace(/#Loaivb:.*|#Tieude:.*|#Tacgia:.*|#Ngay:.*|#Video:.*|#n[ộoiỉ]\s*dung:.*/gi, '')
+                .replace(/https?:\/\/[^\s]+/g, '')
+                .replace(/Có vẻ là.*?Không chạy được/gi, '')
+                .trim();
             const excerpt = cleanExcerptText.substring(0, 150) + (cleanExcerptText.length > 150 ? '...' : '');
 
             // Find main image
@@ -254,9 +302,20 @@ export async function getAllNews(): Promise<NewsArticle[]> {
             }
 
             // Extract video URLs from docx internals AND from text content
-            const docxVideoUrls = extractVideoUrlsFromDocx(filePath);
+            const docxVideoUrls = await extractVideoUrlsFromDocx(filePath);
             const textVideoUrls = extractVideoUrlsFromText(rawText);
             const allVideoUrls = docxVideoUrls.concat(textVideoUrls).filter((url, i, arr) => arr.indexOf(url) === i);
+
+            // If still no image but we have a YouTube video, use its thumbnail
+            if (mainImage === '/news-placeholder.jpg' && allVideoUrls.length > 0) {
+                for (const url of allVideoUrls) {
+                    const ytMatch = url.match(/(?:youtube\.com\/(?:embed\/|watch\?v=|v\/)|youtu\.be\/)([\w-]+)/);
+                    if (ytMatch) {
+                        mainImage = `https://img.youtube.com/vi/${ytMatch[1]}/maxresdefault.jpg`;
+                        break;
+                    }
+                }
+            }
 
             if (allVideoUrls.length > 0) {
                 console.log(`📹 ${file}: Found ${allVideoUrls.length} video(s):`, allVideoUrls);
@@ -284,10 +343,108 @@ export async function getAllNews(): Promise<NewsArticle[]> {
                 date,
                 contentHtml: html,
                 image: mainImage,
-                author
+                author,
+                contentType: 'docx',
             });
         } catch (e) {
             console.error(`Error parsing docx ${file}:`, e);
+        }
+    }
+
+    // Process PPTX files
+    for (const file of pptxFiles) {
+        const filePath = path.join(NEWS_DIR, file);
+        const fileNameWithoutExt = path.basename(file, '.pptx');
+
+        const slug = fileNameWithoutExt
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/(^-|-$)+/g, '')
+            + '-pptx';
+
+        const stat = fs.statSync(filePath);
+        let date = stat.mtime.toISOString();
+
+        try {
+            const pptxResult = await parsePptx(filePath);
+
+            // Extract metadata tags from PPTX raw text (same format as docx)
+            const rawText = pptxResult.rawText;
+            const categoryMatch = rawText.match(/#Loaivb:\s*(.*)/i);
+            const titleMatch = rawText.match(/#Tieude:\s*(.*)/i);
+            const authorMatch = rawText.match(/#Tacgia:\s*(.*)/i);
+            const dateMatch = rawText.match(/#Ngay:\s*(.*)/i);
+
+            let category = categoryMatch ? categoryMatch[1].trim() : 'Trình bày';
+            let title = titleMatch ? titleMatch[1].trim() : pptxResult.title || fileNameWithoutExt;
+            let author = authorMatch ? authorMatch[1].trim() : 'Ban Biên Tập';
+
+            if (dateMatch) {
+                const dateStr = dateMatch[1].trim();
+                const dmyMatch = dateStr.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+                if (dmyMatch) {
+                    const [, d, m, y] = dmyMatch;
+                    date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d)).toISOString();
+                } else {
+                    const parsed = new Date(dateStr);
+                    if (!isNaN(parsed.getTime())) date = parsed.toISOString();
+                }
+            }
+
+            let cleanExcerptText = rawText.replace(/#Loaivb:.*|#Tieude:.*|#Tacgia:.*|#Ngay:.*|#Video:.*|#n[ộoiỉ]\s*dung:.*/gi, '')
+                .replace(/https?:\/\/[^\s]+/g, '')
+                .replace(/Có vẻ là.*?Không chạy được/gi, '')
+                .trim();
+            const excerpt = cleanExcerptText.substring(0, 150) + (cleanExcerptText.length > 150 ? '...' : '');
+
+            // Find main image (external image file next to the pptx)
+            let mainImage = '/news-placeholder.jpg';
+            const extensions = ['.png', '.jpg', '.jpeg', '.webp'];
+            for (const ext of extensions) {
+                if (fs.existsSync(path.join(NEWS_DIR, `${fileNameWithoutExt}${ext}`))) {
+                    mainImage = `/api/news-image/${fileNameWithoutExt}${ext}`;
+                    break;
+                }
+            }
+
+            // If no external image, try to use first slide image as thumbnail
+            if (mainImage === '/news-placeholder.jpg' && pptxResult.slides.length > 0) {
+                const firstSlide = pptxResult.slides[0];
+                if (firstSlide.images.length > 0) {
+                    mainImage = `data:${firstSlide.images[0].contentType};base64,${firstSlide.images[0].data}`;
+                }
+            }
+
+            // If still no image but we have a YouTube video, use its thumbnail
+            if (mainImage === '/news-placeholder.jpg') {
+                const allPptxVideoUrls = pptxResult.slides.flatMap(s => s.videoUrls);
+                for (const url of allPptxVideoUrls) {
+                    const ytMatch = url.match(/(?:youtube\.com\/(?:embed\/|watch\?v=|v\/)|youtu\.be\/)([\w-]+)/);
+                    if (ytMatch) {
+                        mainImage = `https://img.youtube.com/vi/${ytMatch[1]}/maxresdefault.jpg`;
+                        break;
+                    }
+                }
+            }
+
+            console.log(`📊 ${file}: Parsed ${pptxResult.slideCount} slides`);
+
+            articles.push({
+                id: slug,
+                slug,
+                title,
+                category,
+                excerpt: excerpt || '',
+                date,
+                contentHtml: pptxResult.html,
+                image: mainImage,
+                author,
+                contentType: 'pptx',
+            });
+        } catch (e) {
+            console.error(`Error parsing pptx ${file}:`, e);
         }
     }
 
