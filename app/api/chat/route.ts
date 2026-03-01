@@ -2,6 +2,9 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 import { NextRequest, NextResponse } from 'next/server'
 import { getVectorStore } from '@/utils/rag'
 
+// Vercel serverless function timeout (seconds)
+export const maxDuration = 30;
+
 // Simple In-Memory Rate Limiter
 const rateLimitMap = new Map<string, { count: number, resetTime: number }>();
 const LIMIT = 10;
@@ -143,20 +146,30 @@ export async function POST(req: NextRequest) {
     // Add user message to history
     addToHistory(sessionId, 'user', message);
 
-    // 1. Search knowledge base for relevant context
+    // 1. Search knowledge base with timeout (don't block if slow)
     let ragContext = '';
     try {
-      const store = getVectorStore(apiKey);
-      const searchResults = await store.search(message, 3);
+      const ragPromise = (async () => {
+        const store = getVectorStore(apiKey);
+        return await store.search(message, 3);
+      })();
+
+      // Give RAG max 3 seconds, skip if too slow
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('RAG timeout')), 3000)
+      );
+
+      const searchResults = await Promise.race([ragPromise, timeoutPromise]);
 
       if (searchResults.length > 0) {
         ragContext = '\n\nTHÔNG TIN CHI TIẾT TỪ TÀI LIỆU:\n' +
-          searchResults.map((r, i) =>
+          searchResults.map((r: any, i: number) =>
             `[${i + 1}] Từ ${r.chunk.type === 'image' ? 'hình ảnh' : 'tài liệu'} "${r.chunk.metadata.filename}":\n${r.chunk.content.substring(0, 500)}...`
           ).join('\n\n');
       }
-    } catch (error) {
-      console.error('Lỗi tìm kiếm RAG:', error);
+    } catch (error: any) {
+      // RAG search failed or timed out - continue without it
+      console.log('RAG search skipped:', error?.message || 'unknown error');
     }
 
     // 2. Build conversation context from history
