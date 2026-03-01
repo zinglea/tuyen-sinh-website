@@ -26,6 +26,18 @@ const securityHeaders = [
   {
     key: 'Referrer-Policy',
     value: 'origin-when-cross-origin'
+  },
+  {
+    key: 'Content-Security-Policy',
+    value: [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src 'self' https://fonts.gstatic.com",
+      "img-src 'self' data: blob: https:",
+      "frame-src https://www.youtube.com https://youtube.com https://www.facebook.com https://web.facebook.com",
+      "connect-src 'self' https://generativelanguage.googleapis.com",
+    ].join('; ')
   }
 ];
 
@@ -35,7 +47,6 @@ const nextConfig = {
   async headers() {
     return [
       {
-        // Apply these headers to all routes in your application.
         source: '/(.*)',
         headers: securityHeaders,
       },

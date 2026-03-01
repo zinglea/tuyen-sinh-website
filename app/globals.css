@@ -22,7 +22,7 @@
   }
 }
 
-/* Hide Next.js dev tools floating icon */
+/* Hide Next.js dev tools */
 #nextjs-build-indicator,
 nextjs-portal {
   display: none !important;
@@ -33,9 +33,26 @@ nextjs-portal {
   width: 8px;
 }
 
-/* DOCX Parsed HTML Styles */
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* ============================
+   DOCX Content Styles
+   ============================ */
+
 .docx-content p {
   margin-bottom: 1.25rem;
+  line-height: 1.8;
 }
 
 .docx-content h1,
@@ -72,6 +89,9 @@ nextjs-portal {
   border-collapse: collapse;
   margin: 2rem 0;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  font-size: 0.9rem;
 }
 
 .docx-content th,
@@ -91,15 +111,69 @@ nextjs-portal {
   background-color: #fcfcfc;
 }
 
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
+/* Video container responsive */
+.docx-content .video-container {
+  position: relative;
+  padding-bottom: 56.25%; /* 16:9 */
+  height: 0;
+  overflow: hidden;
+  max-width: 100%;
+  margin: 1.5em 0;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
 }
 
-::-webkit-scrollbar-thumb {
-  background: #888;
-  border-radius: 4px;
+.docx-content .video-container iframe,
+.docx-content .video-container video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 12px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #555;
+.docx-content video {
+  max-width: 100%;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  margin: 1.5em 0;
+}
+
+/* Links in article content */
+.docx-content a {
+  color: #2563eb;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.docx-content a:hover {
+  color: #1d4ed8;
+}
+
+/* Mobile responsive for docx-content */
+@media (max-width: 640px) {
+  .docx-content {
+    font-size: 0.95rem;
+  }
+
+  .docx-content img {
+    margin: 1rem auto;
+    border-radius: 0.5rem;
+  }
+
+  .docx-content table {
+    font-size: 0.75rem;
+  }
+
+  .docx-content th,
+  .docx-content td {
+    padding: 0.5rem 0.4rem;
+  }
+
+  .docx-content .video-container {
+    margin: 1em 0;
+    border-radius: 8px;
+  }
 }
