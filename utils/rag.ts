@@ -1,8 +1,10 @@
 import fs from 'fs';
 import path from 'path';
 import mammoth from 'mammoth';
-import * as pdfParse from 'pdf-parse';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+
+// PDF parse - use require for CommonJS compatibility
+const pdfParse = require('pdf-parse');
 
 // Types
 export interface DocumentChunk {
