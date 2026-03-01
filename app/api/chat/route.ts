@@ -1,5 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { NextRequest, NextResponse } from 'next/server'
+import fs from 'fs'
+import path from 'path'
 
 // Vercel serverless function timeout (seconds)
 export const maxDuration = 30;
@@ -13,28 +15,39 @@ const WINDOW_MS = 60 * 1000;
 const conversationStore = new Map<string, { role: string, content: string }[]>();
 const MAX_HISTORY = 10;
 
+// Load knowledge base once (cached across requests in same instance)
+let knowledgeBase = '';
+function getKnowledgeBase(): string {
+  if (knowledgeBase) return knowledgeBase;
+
+  try {
+    const kbPath = path.join(process.cwd(), 'data', 'rag', 'knowledge.txt');
+    if (fs.existsSync(kbPath)) {
+      knowledgeBase = fs.readFileSync(kbPath, 'utf-8');
+      console.log(`[Chat] Loaded knowledge base: ${Math.round(knowledgeBase.length / 1024)}KB`);
+    }
+  } catch (error) {
+    console.error('[Chat] Failed to load knowledge base:', error);
+  }
+
+  return knowledgeBase;
+}
+
 const SYSTEM_PROMPT = `
 BẠN LÀ TRỢ LÝ AI TƯ VẤN TUYỂN SINH CỦA CÔNG AN TỈNH CAO BẰNG - PHÒNG TỔ CHỨC CÁN BỘ.
 
-THÔNG TIN TUYỂN SINH NĂM 2026:
-
-1. ĐIỀU KIỆN DỰ TUYỂN:
-- Độ tuổi: Từ 18 đến 22 tuổi. Cán bộ, chiến sĩ nghĩa vụ hoặc xuất ngũ có thể cao hơn.
-- Tốt nghiệp THPT hoặc tương đương.
-- Thường trú tại tỉnh Cao Bằng.
-- Chiều cao: Nam >= 1.64m, Nữ >= 1.58m.
-
-2. CÁC TRƯỜNG: Học viện ANND, Học viện CSND, ĐH PCCC, ĐH Kỹ thuật - Hậu cần CAND...
-
-3. CHẾ ĐỘ: Miễn học phí, bao ăn ở, phụ cấp sinh hoạt, BHYT.
-
-4. LIÊN HỆ: Phòng Tổ chức cán bộ - Công an tỉnh Cao Bằng.
-
 QUY TẮC TRẢ LỜI:
-- Lịch sự, thân thiện, ngắn gọn
+- Lịch sự, thân thiện, chuyên nghiệp
+- Trả lời ngắn gọn, súc tích, dễ hiểu
 - Luôn trả lời bằng tiếng Việt
-- KHÔNG dùng LaTeX ($$), viết text thuần
-- Dùng emoji: 📌 thông tin quan trọng, ✅ điều kiện, 💡 lưu ý
+- KHÔNG dùng LaTeX ($$ hay $), viết công thức bằng text thuần 
+  Ví dụ: "ĐXT = (M1+M2+M3) x 2/5 + BTBCA x 3/5 + ĐC"
+- Dùng bullet points (-) và số thứ tự (1., 2., 3.) rõ ràng
+- Bôi đậm từ khóa quan trọng bằng **dấu sao**
+- Dùng emoji: 📌 thông tin quan trọng, ✅ điều kiện, 💡 lưu ý, 🎯 mục tiêu
+- Nếu không biết thông tin, khuyên liên hệ Phòng TCCB - Công an tỉnh Cao Bằng
+- NHỚ NGỮ CẢNH: tham chiếu câu hỏi/trả lời trước đó
+- "năm nay" = 2026, "năm trước" = 2025
 `;
 
 export async function POST(req: NextRequest) {
@@ -84,47 +97,41 @@ export async function POST(req: NextRequest) {
     let conversationContext = '';
     if (history.length > 1) {
       conversationContext = '\n\nLỊCH SỬ TRÒ CHUYỆN:\n' +
-        history.slice(0, -1).map((msg, i) =>
-          `${msg.role === 'user' ? 'Thí sinh' : 'AI'}: ${msg.content.substring(0, 150)}`
+        history.slice(0, -1).map((msg) =>
+          `${msg.role === 'user' ? 'Thí sinh' : 'AI'}: ${msg.content.substring(0, 200)}`
         ).join('\n') + '\n';
     }
 
+    // Load knowledge base
+    const kb = getKnowledgeBase();
+    const knowledgeContext = kb
+      ? `\n\nDƯỚI ĐÂY LÀ TÀI LIỆU HƯỚNG DẪN TUYỂN SINH CHÍNH THỨC (BỘ CÔNG AN). Hãy dựa vào tài liệu này để trả lời:\n\n${kb}\n`
+      : '';
+
     // Build prompt
-    const prompt = `${SYSTEM_PROMPT}${conversationContext}\n\nCâu hỏi: ${message}\n\nTrả lời bằng tiếng Việt:`;
+    const prompt = `${SYSTEM_PROMPT}${knowledgeContext}${conversationContext}\n\nCâu hỏi hiện tại: ${message}\n\nTrả lời:`;
 
-    console.log(`[Chat] Starting Gemini call at +${Date.now() - startTime}ms`);
+    console.log(`[Chat] Prompt size: ${Math.round(prompt.length / 1024)}KB, starting Gemini call at +${Date.now() - startTime}ms`);
 
-    // Call Gemini with timeout
+    // Call Gemini
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 25000); // 25s timeout
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
 
-    try {
-      const result = await model.generateContent(prompt);
-      clearTimeout(timeout);
+    console.log(`[Chat] Gemini responded at +${Date.now() - startTime}ms`);
 
-      const response = await result.response;
-      const text = response.text();
+    // Save AI response to history
+    history.push({ role: 'model', content: text });
+    if (history.length > MAX_HISTORY) history.shift();
+    conversationStore.set(sessionId, history);
 
-      console.log(`[Chat] Gemini responded at +${Date.now() - startTime}ms`);
-
-      // Save AI response to history
-      history.push({ role: 'model', content: text });
-      if (history.length > MAX_HISTORY) history.shift();
-      conversationStore.set(sessionId, history);
-
-      return NextResponse.json({
-        response: text,
-        sessionId: sessionId,
-        _debug: { totalMs: Date.now() - startTime }
-      });
-    } catch (genError: any) {
-      clearTimeout(timeout);
-      console.error(`[Chat] Gemini error at +${Date.now() - startTime}ms:`, genError?.message);
-      throw genError;
-    }
+    return NextResponse.json({
+      response: text,
+      sessionId: sessionId,
+    });
 
   } catch (error: any) {
     console.error('[Chat] Error:', error?.message || error);
@@ -138,7 +145,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       response: errorMsg,
       sessionId: null,
-      _debug: { error: error?.message, totalMs: Date.now() - startTime }
     });
   }
 }
