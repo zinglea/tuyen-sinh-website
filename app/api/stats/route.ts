@@ -1,111 +1,81 @@
 import { NextResponse } from 'next/server'
-import fs from 'fs'
-import path from 'path'
-import os from 'os'
+import { Redis } from '@upstash/redis'
 
-// Use /tmp on Vercel (writable), fallback to data/ locally
-const isVercel = process.env.VERCEL === '1'
-const DB_DIR = isVercel ? os.tmpdir() : path.join(process.cwd(), 'data')
-const DB_FILE = path.join(DB_DIR, 'stats.json')
+// Auto-reads UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN from env
+const redis = Redis.fromEnv()
 
-interface StatsData {
-    total: number;
-    todayCount: number;
-    lastDate: string;
-    onlineUsers: { [sessionId: string]: number }; // sessionId -> last ping timestamp
-}
-
-const SEED_DATA: StatsData = {
-    total: 0,
-    todayCount: 0,
-    lastDate: new Date().toDateString(),
-    onlineUsers: {}
-}
-
-function readStats(): StatsData {
-    try {
-        if (fs.existsSync(DB_FILE)) {
-            const raw = fs.readFileSync(DB_FILE, 'utf-8')
-            return JSON.parse(raw)
-        }
-    } catch (e) { /* ignore */ }
-    return { ...SEED_DATA }
-}
-
-function writeStats(data: StatsData): void {
-    try {
-        if (!fs.existsSync(DB_DIR)) {
-            fs.mkdirSync(DB_DIR, { recursive: true })
-        }
-        fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2))
-    } catch (e) {
-        console.error('Failed to write stats:', e)
-    }
-}
+// Keys in Redis
+const TOTAL_KEY = 'stats:total'
+const TODAY_COUNT_KEY = 'stats:today_count'
+const TODAY_DATE_KEY = 'stats:today_date'
+const ONLINE_PREFIX = 'online:'
 
 export async function GET() {
-    const data = readStats()
+    try {
+        const total = (await redis.get<number>(TOTAL_KEY)) || 0
+        const todayDate = await redis.get<string>(TODAY_DATE_KEY)
+        const today = new Date().toDateString()
 
-    // Clean up online users (older than 5 minutes)
-    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000
-    let activeCount = 0
-    for (const sid in data.onlineUsers) {
-        if (data.onlineUsers[sid] > fiveMinutesAgo) {
-            activeCount++
+        let todayCount = 0
+        if (todayDate === today) {
+            todayCount = (await redis.get<number>(TODAY_COUNT_KEY)) || 0
         }
-    }
 
-    return NextResponse.json({
-        totalVisitors: data.total,
-        todayViews: data.todayCount,
-        onlineNow: Math.max(1, activeCount)
-    })
+        // Count online users (keys with online: prefix that haven't expired)
+        const onlineKeys = await redis.keys(ONLINE_PREFIX + '*')
+        const onlineCount = onlineKeys.length
+
+        return NextResponse.json({
+            totalVisitors: total,
+            todayViews: todayCount,
+            onlineNow: Math.max(1, onlineCount)
+        })
+    } catch (e) {
+        console.error('Stats GET error:', e)
+        return NextResponse.json({
+            totalVisitors: 0,
+            todayViews: 0,
+            onlineNow: 1
+        })
+    }
 }
 
 export async function POST(request: Request) {
     try {
         const { searchParams } = new URL(request.url)
-        const action = searchParams.get('action') // 'new_visit' or 'ping'
+        const action = searchParams.get('action')
         const sessionId = searchParams.get('session') || 'anon-' + Date.now()
 
-        const data = readStats()
         const today = new Date().toDateString()
-        const now = Date.now()
+        const savedDate = await redis.get<string>(TODAY_DATE_KEY)
 
         // Reset daily counter if new day
-        if (data.lastDate !== today) {
-            data.lastDate = today
-            data.todayCount = 0
+        if (savedDate !== today) {
+            await redis.set(TODAY_DATE_KEY, today)
+            await redis.set(TODAY_COUNT_KEY, 0)
         }
 
         if (action === 'new_visit') {
-            data.total += 1
-            data.todayCount += 1
+            await redis.incr(TOTAL_KEY)
+            await redis.incr(TODAY_COUNT_KEY)
         }
 
-        // Update online timestamp for this session
-        data.onlineUsers[sessionId] = now
+        // Mark this session as online (auto-expires in 5 minutes = 300 seconds)
+        await redis.set(ONLINE_PREFIX + sessionId, 1, { ex: 300 })
 
-        // Prune sessions older than 5 minutes
-        const fiveMinutesAgo = now - 5 * 60 * 1000
-        for (const sid in data.onlineUsers) {
-            if (data.onlineUsers[sid] <= fiveMinutesAgo) {
-                delete data.onlineUsers[sid]
-            }
-        }
-
-        writeStats(data)
-
-        const onlineCount = Object.keys(data.onlineUsers).length
+        // Get current counts
+        const total = (await redis.get<number>(TOTAL_KEY)) || 0
+        const todayCount = (await redis.get<number>(TODAY_COUNT_KEY)) || 0
+        const onlineKeys = await redis.keys(ONLINE_PREFIX + '*')
 
         return NextResponse.json({
             success: true,
-            totalVisitors: data.total,
-            todayViews: data.todayCount,
-            onlineNow: Math.max(1, onlineCount)
+            totalVisitors: total,
+            todayViews: todayCount,
+            onlineNow: Math.max(1, onlineKeys.length)
         })
-
     } catch (e) {
+        console.error('Stats POST error:', e)
         return NextResponse.json({ error: 'Cannot update stats' }, { status: 500 })
     }
 }
