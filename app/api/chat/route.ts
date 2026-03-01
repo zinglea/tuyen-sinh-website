@@ -2,42 +2,6 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 import { NextRequest, NextResponse } from 'next/server'
 import { getVectorStore } from '@/utils/rag'
 
-// Polyfill for DOMMatrix in server environment
-if (typeof globalThis.DOMMatrix === 'undefined') {
-  globalThis.DOMMatrix = class DOMMatrix {
-    constructor() {
-      this.a = 1; this.b = 0; this.c = 0; this.d = 1; this.e = 0; this.f = 0;
-    }
-    a: number; b: number; c: number; d: number; e: number; f: number;
-  } as any;
-}
-
-// Polyfill for ImageData in server environment
-if (typeof globalThis.ImageData === 'undefined') {
-  globalThis.ImageData = class ImageData {
-    constructor() {}
-  } as any;
-}
-
-// Polyfill for Path2D in server environment
-if (typeof globalThis.Path2D === 'undefined') {
-  globalThis.Path2D = class Path2D {
-    constructor() {}
-  } as any;
-}
-
-// Get API key from environment variable (production deployment)
-function getApiKey(): string | null {
-  const envKey = process.env.GEMINI_API_KEY;
-  if (envKey && envKey.length > 10) {
-    console.log('Using API key from environment variable');
-    return envKey;
-  }
-
-  console.warn('No valid API key found in environment');
-  return null;
-}
-
 // Simple In-Memory Rate Limiter
 const rateLimitMap = new Map<string, { count: number, resetTime: number }>();
 const LIMIT = 10;
@@ -115,25 +79,25 @@ function addToHistory(sessionId: string, role: 'user' | 'model', content: string
     content,
     timestamp: Date.now(),
   });
-  
+
   // Keep only last MAX_HISTORY messages
   if (history.length > MAX_HISTORY) {
     history.shift();
   }
-  
+
   conversationStore.set(sessionId, history);
 }
 
 function buildConversationContext(history: any[]) {
   if (history.length === 0) return '';
-  
+
   let context = '\n\nLỊCH SỬ CUỘC TRÒ CHUYỆN GẦN ĐÂY:\n';
   history.forEach((msg, index) => {
     const prefix = msg.role === 'user' ? 'Thí sinh' : 'Trợ lý AI';
     context += `[${index + 1}] ${prefix}: ${msg.content.substring(0, 200)}${msg.content.length > 200 ? '...' : ''}\n`;
   });
   context += '\nHãy dựa vào lịch sử trên để trả lời câu hỏi tiếp theo một cách liên tục và chính xác.\n';
-  
+
   return context;
 }
 
@@ -146,9 +110,9 @@ export async function POST(req: NextRequest) {
 
     if (userStatus && now < userStatus.resetTime) {
       if (userStatus.count >= LIMIT) {
-        return NextResponse.json({ 
+        return NextResponse.json({
           response: 'Bạn đã hỏi quá nhanh. Vui lòng đợi 1 phút để tiếp tục trò chuyện!',
-          sessionId: null 
+          sessionId: null
         }, { status: 429 });
       }
       userStatus.count += 1;
@@ -172,10 +136,10 @@ export async function POST(req: NextRequest) {
 
     // Get or create session ID
     const sessionId = clientSessionId || `session_${ip}_${Date.now()}`;
-    
+
     // Get conversation history
     const history = getConversationHistory(sessionId);
-    
+
     // Add user message to history
     addToHistory(sessionId, 'user', message);
 
@@ -184,10 +148,10 @@ export async function POST(req: NextRequest) {
     try {
       const store = getVectorStore(apiKey);
       const searchResults = await store.search(message, 3);
-      
+
       if (searchResults.length > 0) {
-        ragContext = '\n\nTHÔNG TIN CHI TIẾT TỪ TÀI LIỆU:\n' + 
-          searchResults.map((r, i) => 
+        ragContext = '\n\nTHÔNG TIN CHI TIẾT TỪ TÀI LIỆU:\n' +
+          searchResults.map((r, i) =>
             `[${i + 1}] Từ ${r.chunk.type === 'image' ? 'hình ảnh' : 'tài liệu'} "${r.chunk.metadata.filename}":\n${r.chunk.content.substring(0, 500)}...`
           ).join('\n\n');
       }
@@ -215,9 +179,9 @@ export async function POST(req: NextRequest) {
     // 6. Add AI response to history
     addToHistory(sessionId, 'model', text);
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       response: text,
-      sessionId: sessionId 
+      sessionId: sessionId
     });
 
   } catch (error: any) {

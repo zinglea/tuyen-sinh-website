@@ -1,21 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { processAllFiles, getVectorStore } from '@/utils/rag';
-
-// Admin password for security (should be set in environment variable)
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+import { getVectorStore } from '@/utils/rag';
 
 export async function POST(req: NextRequest) {
   try {
-    // Verify admin password
-    const { password } = await req.json();
-    
-    if (password !== ADMIN_PASSWORD) {
-      return NextResponse.json(
-        { error: 'Unauthorized - Sai mật khẩu admin' },
-        { status: 401 }
-      );
-    }
-
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
@@ -24,22 +11,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Process all files
-    const result = await processAllFiles(apiKey);
-    
     const stats = getVectorStore(apiKey).getStats();
 
     return NextResponse.json({
       success: true,
-      message: `Đã xử lý ${result.processed} files thành công`,
+      message: 'RAG data loaded from pre-processed files. To update, process documents locally and push to repo.',
       stats,
-      errors: result.errors,
     });
 
   } catch (error) {
-    console.error('Lỗi xử lý files:', error);
+    console.error('Lỗi xử lý:', error);
     return NextResponse.json(
-      { error: 'Lỗi server khi xử lý files' },
+      { error: 'Lỗi server' },
       { status: 500 }
     );
   }

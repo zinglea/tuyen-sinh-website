@@ -35,8 +35,13 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Knowledge base - sensitive data (chỉ admin có quyền truy cập)
-# /knowledge-base/ gốc đã được mã hóa vào .secure/, không cần commit thư mục gốc
+# Security - encrypted keys and sensitive data
+/.secure/
+
+# Knowledge base raw files (processed data in /data/rag/ is committed)
 /knowledge-base/
+
+# Build artifacts
+/dist/
 
 # misc
