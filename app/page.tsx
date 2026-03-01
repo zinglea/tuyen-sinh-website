@@ -4,6 +4,7 @@ import { getAllNews } from '@/utils/docxParser'
 import NewsCarousel from '@/components/NewsCarousel'
 import ScoreCalculator from '@/components/ScoreCalculator'
 import VisitorCounter from '@/components/VisitorCounter'
+import Header from '@/components/Header'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,50 +15,8 @@ export default async function Home() {
   return (
     <div className="min-h-screen bg-slate-50 font-sans selection:bg-police-dark selection:text-white">
       {/* Header */}
-      <header className="bg-white sticky top-0 z-50 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.1)]">
-        {/* Top Banner */}
-        <div className="bg-police-dark text-white py-4 md:py-6 relative overflow-hidden">
-          <div className="absolute right-0 top-0 w-1/3 h-full bg-gradient-to-l from-police-light/20 to-transparent skew-x-12 transform translate-x-10"></div>
-          <div className="container mx-auto px-4 flex items-center justify-center md:justify-start gap-4 md:gap-6 relative z-10">
-            <img src="/logo.png" alt="CAND Logo" className="w-16 h-16 md:w-24 md:h-24 object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]" />
-            <div className="flex flex-col text-center md:text-left">
-              <h2 className="text-sm md:text-xl font-bold uppercase tracking-widest text-police-accent mb-0.5 md:mb-1 drop-shadow-md">
-                Phòng Tổ chức cán bộ - Công an tỉnh Cao Bằng
-              </h2>
-              <h1 className="text-2xl md:text-4xl lg:text-5xl font-extrabold uppercase tracking-tight drop-shadow-lg leading-tight">
-                CỔNG THÔNG TIN TUYỂN SINH
-              </h1>
-            </div>
-          </div>
-        </div>
-
-        {/* Navigation */}
-        <nav className="bg-white/80 backdrop-blur-md text-police-nav border-b border-gray-100 relative">
-          <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-police-dark via-police-accent to-police-light"></div>
-          <div className="container mx-auto px-4">
-            <ul className="flex flex-wrap md:flex-nowrap items-center justify-center md:justify-start space-x-1 md:space-x-8 text-sm md:text-base font-bold uppercase tracking-wide">
-              <li>
-                <Link href="/" className="inline-block py-4 px-2 hover:text-police-light transition-colors relative group">
-                  Trang chủ
-                  <span className="absolute -bottom-[1px] left-0 w-full h-1 bg-police-accent rounded-t-md opacity-100"></span>
-                </Link>
-              </li>
-              <li>
-                <Link href="/tin-tuc" className="inline-block py-4 px-2 hover:text-police-light transition-colors relative group">
-                  Tin tức & Sự kiện
-                  <span className="absolute -bottom-[1px] left-0 w-0 h-1 bg-police-accent rounded-t-md opacity-0 group-hover:w-full group-hover:opacity-100 transition-all duration-300"></span>
-                </Link>
-              </li>
-              <li>
-                <Link href="/chatbot" className="inline-block py-4 px-2 hover:text-police-light transition-colors relative group">
-                  Trợ lý AI
-                  <span className="absolute -bottom-[1px] left-0 w-0 h-1 bg-police-accent rounded-t-md opacity-0 group-hover:w-full group-hover:opacity-100 transition-all duration-300"></span>
-                </Link>
-              </li>
-            </ul>
-          </div>
-        </nav>
-      </header>
+      {/* Header */}
+      <Header />
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-10">

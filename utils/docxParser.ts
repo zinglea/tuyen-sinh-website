@@ -5,6 +5,7 @@ import { parsePptx } from './pptxParser';
 
 
 const NEWS_DIR = path.join(process.cwd(), 'data/news');
+const DOCS_DIR = path.join(process.cwd(), 'public/doccuments');
 
 export interface NewsArticle {
     id: string;
@@ -16,7 +17,8 @@ export interface NewsArticle {
     contentHtml: string;
     image?: string;
     author?: string;
-    contentType?: 'docx' | 'pptx';
+    contentType?: 'docx' | 'pptx' | 'raw_document';
+    rawFileUrl?: string; // For raw_document types to link directly to the file
 }
 
 /**
@@ -448,7 +450,106 @@ export async function getAllNews(): Promise<NewsArticle[]> {
         }
     }
 
-    return articles.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    // Combine with raw documents from public/doccuments
+    const rawDocs = await getDocumentsFromFilenames();
+    const combinedArticles = [...articles, ...rawDocs];
+
+    return combinedArticles.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+}
+
+/**
+ * Parses files in public/doccuments based on filename convention:
+ * [Type]_[Issuer]_[Number]_[DDMMYYYY]_[Excerpt].[ext]
+ * Example: CV_CAT_PX01_123_23062024_trichyeu.docx
+ */
+export async function getDocumentsFromFilenames(): Promise<NewsArticle[]> {
+    if (!fs.existsSync(DOCS_DIR)) {
+        return [];
+    }
+
+    const allFiles = fs.readdirSync(DOCS_DIR).filter(file => !file.startsWith('~') && file !== '.gitkeep');
+    const articles: NewsArticle[] = [];
+
+    // Map abbreviations to full category names
+    const typeMap: { [key: string]: string } = {
+        'CV': 'Công văn',
+        'TB': 'Thông báo',
+        'HD': 'Hướng dẫn',
+        'QD': 'Quyết định',
+        'KH': 'Kế hoạch',
+        'BC': 'Báo cáo',
+        'TT': 'Tờ trình'
+    };
+
+    // Regex to match: (Letters)_(Letters/Numbers)_(Numbers/Letters)_(8Digits)_(Anything).(ext)
+    // Note: The number part (group 3) might contain letters sometimes in real life (e.g. 123/TB-BCA). We allow [A-Z0-9_\-]+ to be safe, but specifically looking for standard format.
+    const fileRegex = /^([a-zA-Z]+)_([a-zA-Z0-9_]+)_([a-zA-Z0-9\-]+)_(\d{8})_([^.]+)\.([a-zA-Z0-9]+)$/i;
+
+    for (const file of allFiles) {
+        const match = file.match(fileRegex);
+
+        if (match) {
+            const [, typeCode, issuerCode, docNumber, dateStr, excerptRaw, extension] = match;
+
+            const category = typeMap[typeCode.toUpperCase()] || 'Văn bản';
+
+            // Format Issuer: CAT_PX01 -> Công an tỉnh - PX01 (Simple heuristic replace for standard look)
+            let author = issuerCode.replace(/_/g, ' ');
+            if (author.toUpperCase().startsWith('CAT ')) author = author.replace(/CAT /i, 'Công an tỉnh - ');
+
+            // Parse Date: DDMMYYYY
+            // Parse Date: DDMMYYYY
+            const d = dateStr.substring(0, 2);
+            const m = dateStr.substring(2, 4);
+            const y = dateStr.substring(4, 8);
+            const isoDate = new Date(parseInt(y), parseInt(m) - 1, parseInt(d)).toISOString();
+
+            // Format Title & Excerpt
+            const cleanExcerpt = excerptRaw.replace(/_/g, ' ');
+            // Format Title
+            // Example: 4708/X02-P2
+            const title = `${docNumber}/${issuerCode.replace(/_/g, '-')}`;
+
+            // Build the slug
+            const slug = `doc-${docNumber}-${dateStr}-${cleanExcerpt.replace(/\s+/g, '-').toLowerCase()}`;
+
+            // Generate contentHtml to allow viewing the file right on the web
+            const rawPath = `/doccuments/${file}`;
+            const fileUrl = encodeURI(rawPath);
+            const ext = extension.toLowerCase();
+            let contentHtml = '';
+
+            if (ext === 'pdf') {
+                contentHtml = ''; // PDF rendering is now handled by PdfViewerClient in the detailed page to bypass IDM
+            } else {
+                contentHtml = `
+                    <div style="text-align: center; padding: 4rem 2rem; background: #f8fafc; border-radius: 12px; border: 2px dashed #cbd5e1;">
+                        <h3 style="font-size: 1.5rem; font-weight: bold; color: #334155; margin-bottom: 0.5rem;">Đính kèm tệp: ${file}</h3>
+                        <p style="color: #64748b; margin-bottom: 2rem; font-size: 1.125rem;">Trình duyệt không hỗ trợ xem trước định dạng này. Vui lòng tải về máy để xem.</p>
+                        <a href="${fileUrl}" download style="display: inline-block; padding: 0.75rem 2rem; background-color: #1e293b; color: white; font-weight: bold; border-radius: 0.75rem; text-decoration: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                            ⬇️ Tải tệp ${ext.toUpperCase()} về máy
+                        </a>
+                    </div>
+                `;
+            }
+
+            articles.push({
+                id: slug,
+                slug: slug,
+                title: title,
+                category: category,
+                excerpt: cleanExcerpt,
+                date: isoDate,
+                contentHtml: contentHtml,
+                image: '/news-placeholder.jpg', // Default or specific icon based on extension could be set here
+                author: author,
+                contentType: 'raw_document',
+                rawFileUrl: fileUrl
+            });
+        }
+    }
+
+    return articles;
 }
 
 export async function getNewsBySlug(slug: string): Promise<NewsArticle | null> {

@@ -3,6 +3,9 @@ import { ArrowLeft, Calendar, GraduationCap, Eye, Share2 } from 'lucide-react'
 import { getNewsBySlug, getAllNews } from '@/utils/docxParser'
 import { notFound } from 'next/navigation'
 import PptxSlideNav from '@/components/PptxSlideNav'
+import Header from '@/components/Header'
+import FacebookComments from '@/components/FacebookComments'
+import PdfViewerClient from '@/components/PdfViewerClient'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,25 +24,7 @@ export default async function NewsDetail({ params }: { params: Promise<{ slug: s
     return (
         <div className="min-h-screen bg-slate-50">
             {/* Header */}
-            <header className="bg-white shadow-md sticky top-0 z-50">
-                <nav className="container mx-auto px-4 py-3 md:py-4">
-                    <div className="flex items-center justify-between">
-                        <Link href="/tin-tuc" className="flex items-center space-x-2 text-slate-700 hover:text-police-light transition">
-                            <div className="p-2 rounded-xl bg-slate-100 hover:bg-police-100 transition">
-                                <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" />
-                            </div>
-                            <span className="font-medium hidden sm:inline">Quay lại</span>
-                        </Link>
-                        <div className="flex items-center space-x-3">
-                            <img src="/logo.png" alt="Logo Công an Cao Bằng" className="w-8 h-8 md:w-10 md:h-10 object-contain drop-shadow-md" />
-                            <span className="text-base md:text-xl font-bold text-police-dark tracking-tight uppercase">Tin tức</span>
-                        </div>
-                        <Link href="/chatbot" className="text-police-light hover:text-police-dark font-semibold transition text-sm md:text-base">
-                            Hỏi đáp AI
-                        </Link>
-                    </div>
-                </nav>
-            </header>
+            <Header />
 
             <div className="container mx-auto px-4 py-6 md:py-12">
                 <div className="max-w-4xl mx-auto">
@@ -66,8 +51,19 @@ export default async function NewsDetail({ params }: { params: Promise<{ slug: s
                             {article.title}
                         </h1>
 
-                        {/* Content - uses PptxSlideNav for both docx and pptx to enable slide navigation */}
-                        <PptxSlideNav contentHtml={article.contentHtml} />
+                        {/* Content - conditionally render safe PDF Viewer or normal content */}
+                        {article.contentType === 'raw_document' && article.rawFileUrl?.toLowerCase().endsWith('.pdf') ? (
+                            <div className="flex flex-col gap-6">
+                                <PdfViewerClient fileUrl={`/api/pdf?file=${encodeURIComponent(article.rawFileUrl.split('/').pop() || '')}`} />
+                                <div className="text-center">
+                                    <a href={article.rawFileUrl} download className="inline-block px-8 py-3 bg-police-dark text-white font-bold rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                                        ⬇️ Tải file gốc về máy
+                                    </a>
+                                </div>
+                            </div>
+                        ) : (
+                            <PptxSlideNav contentHtml={article.contentHtml} />
+                        )}
 
                         {/* Social share + CTA */}
                         <div className="mt-8 md:mt-12 pt-6 md:pt-8 border-t border-slate-200">
@@ -105,6 +101,9 @@ export default async function NewsDetail({ params }: { params: Promise<{ slug: s
                                 </p>
                             </div>
                         </div>
+
+                        {/* Facebook Comments */}
+                        <FacebookComments href={`https://tuyensinhcaobang.vn/tin-tuc/${article.slug}`} />
                     </article>
                 </div>
             </div>

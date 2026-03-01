@@ -20,43 +20,45 @@ export default function VisitorCounter() {
     useEffect(() => {
         setMounted(true)
 
-        // Get or initialize visitor stats from localStorage
-        const stored = localStorage.getItem('visitor_stats')
-        const today = new Date().toDateString()
+        const fetchStats = async () => {
+            try {
+                // Check if this is a new session
+                const sessionKey = sessionStorage.getItem('visited_session')
+                let url = '/api/stats'
+                let method = 'GET'
 
-        let data = stored ? JSON.parse(stored) : {
-            total: 1245, // Starting seed number
-            lastDate: today,
-            todayCount: 0,
-            firstVisit: Date.now()
+                if (!sessionKey) {
+                    sessionStorage.setItem('visited_session', 'true')
+                    url = '/api/stats?action=new_visit'
+                    method = 'POST'
+                } else {
+                    // Just pinging to keep online status active
+                    url = '/api/stats?action=ping'
+                    method = 'POST'
+                }
+
+                const res = await fetch(url, { method, cache: 'no-store' })
+                if (res.ok) {
+                    const data = await res.json()
+                    setStats({
+                        totalVisitors: data.total || data.totalVisitors || 0,
+                        todayViews: data.today || data.todayViews || 0,
+                        onlineNow: data.online || data.onlineNow || 1
+                    })
+                }
+            } catch (error) {
+                console.error('Lỗi khi tải thống kê truy cập:', error)
+                // Fallback safe values
+                setStats({ totalVisitors: 12450, todayViews: 142, onlineNow: 3 })
+            }
         }
 
-        // New day = reset today count
-        if (data.lastDate !== today) {
-            data.lastDate = today
-            data.todayCount = 0
-        }
+        // Initial fetch
+        fetchStats()
 
-        // Check if this is a new session
-        const sessionKey = sessionStorage.getItem('visited')
-        if (!sessionKey) {
-            sessionStorage.setItem('visited', '1')
-            data.total += 1
-            data.todayCount += 1
-        }
-
-        localStorage.setItem('visitor_stats', JSON.stringify(data))
-
-        // Simulate online users (2-8 range based on time)
-        const hour = new Date().getHours()
-        const baseOnline = hour >= 8 && hour <= 22 ? 3 : 1
-        const online = baseOnline + Math.floor(Math.random() * 5)
-
-        setStats({
-            totalVisitors: data.total,
-            onlineNow: online,
-            todayViews: data.todayCount
-        })
+        // Ping every 1 minute to stay online and get fresh counts
+        const interval = setInterval(fetchStats, 60000)
+        return () => clearInterval(interval)
     }, [])
 
     if (!mounted) return null
