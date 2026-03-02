@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/utils/supabase/client'
-import { Plus, Trash2, X, Newspaper, Calendar, User, Cloud, Server, Eye, Upload as UploadIcon, FileUp, Edit3, Image as ImageIcon } from 'lucide-react'
+import { Plus, Trash2, X, Newspaper, Calendar, User, Cloud, Server, Eye, Upload as UploadIcon, FileUp, Edit3, Image as ImageIcon, Search } from 'lucide-react'
 import RichEditor from '@/components/RichEditor'
+import { maskSupabaseUrl } from '@/utils/maskUrl'
 
 interface NewsItem {
     id: string
@@ -31,6 +32,8 @@ export default function AdminNewsPage() {
     const [migrating, setMigrating] = useState<string | null>(null)
     const [progress, setProgress] = useState('')
     const [showPreview, setShowPreview] = useState(false)
+    const [searchTerm, setSearchTerm] = useState('')
+    const [editingId, setEditingId] = useState<string | null>(null)
 
     // Mode: 'write' = soạn thảo, 'upload' = upload file
     const [mode, setMode] = useState<'write' | 'upload'>('upload')
@@ -58,7 +61,13 @@ export default function AdminNewsPage() {
     const fetchAll = async () => {
         setLoading(true)
         const { data: sbData } = await supabase.from('news').select('*').order('created_at', { ascending: false })
-        const supabaseItems: NewsItem[] = (sbData || []).map((item: any) => ({ ...item, source: 'supabase' as const, category: item.category || 'Tin tức' }))
+        const supabaseItems: NewsItem[] = (sbData || []).map((item: any) => ({
+            ...item,
+            source: 'supabase' as const,
+            category: item.category || 'Tin tức',
+            image_url: maskSupabaseUrl(item.image_url),
+            content: maskSupabaseUrl(item.content)
+        }))
 
         let localItems: NewsItem[] = []
         try {
@@ -85,8 +94,23 @@ export default function AdminNewsPage() {
     const resetForm = () => {
         setTitle(''); setContent(''); setAuthor('Admin'); setCategory('Tin Tức'); setArticleDate('')
         setSelectedFile(null); setParsedHtml(''); setThumbnailFile(null); setThumbnailPreview('')
+        setEditingId(null)
+        setMode('write') // Default to write for edit mostly
         if (fileRef.current) fileRef.current.value = ''
         if (thumbnailRef.current) thumbnailRef.current.value = ''
+    }
+
+    const handleEdit = (item: NewsItem) => {
+        setEditingId(item.id)
+        setTitle(item.title)
+        setContent(item.content || '')
+        setAuthor(item.author)
+        setCategory(item.category || 'Tin Tức')
+        setArticleDate(item.created_at ? item.created_at.split('T')[0] : '')
+        setThumbnailPreview(item.image_url || '')
+        setMode('write') // Edit defaults to rich text
+        setParsedHtml('')
+        setShowModal(true)
     }
 
     // Handle file selection → auto parse
@@ -144,6 +168,9 @@ export default function AdminNewsPage() {
                 const { data: urlData } = supabase.storage.from('tuyensinh_files').getPublicUrl(thumbName)
                 imageUrl = urlData.publicUrl
             }
+        } else if (editingId && thumbnailPreview && !thumbnailPreview.startsWith('data:')) {
+            // Keep old image
+            imageUrl = thumbnailPreview
         }
 
         // Determine content
@@ -166,13 +193,25 @@ export default function AdminNewsPage() {
         }
 
         setProgress('Đang lưu bài viết...')
-        const { error } = await supabase.from('news').insert({
+        const payload: any = {
             title,
             content: finalContent,
             author,
             category,
             image_url: imageUrl || null,
-        })
+        }
+        if (articleDate) {
+            payload.created_at = new Date(articleDate).toISOString()
+        }
+
+        let error = null
+        if (editingId) {
+            const { error: updateError } = await supabase.from('news').update(payload).eq('id', editingId)
+            error = updateError
+        } else {
+            const { error: insertError } = await supabase.from('news').insert(payload)
+            error = insertError
+        }
 
         if (!error) {
             setShowModal(false); resetForm(); fetchAll()
@@ -208,7 +247,7 @@ export default function AdminNewsPage() {
     return (
         <div className="p-6 md:p-8">
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
                 <div>
                     <h1 className="text-2xl font-extrabold text-slate-800">Quản lý Tin tức</h1>
                     <p className="text-slate-500 text-sm mt-1">
@@ -216,9 +255,15 @@ export default function AdminNewsPage() {
                         {localCount > 0 && <> · <span className="text-amber-600 font-medium">{localCount} Local</span></>}
                     </p>
                 </div>
-                <button onClick={() => setShowModal(true)} className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/20 transition-all">
-                    <Plus className="w-5 h-5" /> Thêm bài viết
-                </button>
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                    <div className="relative flex-1 sm:w-64">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <input type="text" placeholder="Tìm kiếm tin tức..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition" />
+                    </div>
+                    <button onClick={() => { resetForm(); setShowModal(true) }} className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/20 transition-all shrink-0">
+                        <Plus className="w-5 h-5" /> Thêm bài viết
+                    </button>
+                </div>
             </div>
 
             {/* News List */}
@@ -231,7 +276,7 @@ export default function AdminNewsPage() {
                     </div>
                 ) : (
                     <div className="divide-y divide-slate-100">
-                        {news.map((item) => (
+                        {news.filter(n => n.title.toLowerCase().includes(searchTerm.toLowerCase())).map((item) => (
                             <div key={`${item.source}-${item.id}`} className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50/50 transition">
                                 <div className="w-16 h-16 rounded-xl bg-slate-100 overflow-hidden shrink-0">
                                     {item.image_url ? (
@@ -261,6 +306,7 @@ export default function AdminNewsPage() {
                                     ) : item.source === 'supabase' ? (
                                         <button onClick={() => setViewItem(item)} className="p-2 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Xem"><Eye className="w-4 h-4" /></button>
                                     ) : null}
+                                    {item.source === 'supabase' && <button onClick={() => handleEdit(item)} className="p-2 text-orange-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition" title="Sửa"><Edit3 className="w-4 h-4" /></button>}
                                     {item.source === 'local' && (
                                         <button onClick={() => handleMigrateToCloud(item)} disabled={migrating === item.id} className="p-2 text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition disabled:opacity-50" title="Đẩy lên Cloud"><UploadIcon className="w-4 h-4" /></button>
                                     )}
@@ -297,7 +343,7 @@ export default function AdminNewsPage() {
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col">
                         {/* Modal Header */}
                         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
-                            <h2 className="text-lg font-bold text-slate-800">Thêm bài viết mới</h2>
+                            <h2 className="text-lg font-bold text-slate-800">{editingId ? 'Sửa bài viết' : 'Thêm bài viết mới'}</h2>
                             <button onClick={() => { setShowModal(false); resetForm() }} className="p-1 hover:bg-slate-100 rounded-lg transition"><X className="w-5 h-5 text-slate-400" /></button>
                         </div>
 
@@ -423,8 +469,8 @@ export default function AdminNewsPage() {
                                 <button type="button" onClick={() => setShowPreview(!showPreview)} disabled={mode === 'upload' ? !parsedHtml : !content} className="py-2.5 px-5 border border-blue-200 text-blue-600 font-semibold rounded-xl hover:bg-blue-50 transition text-sm disabled:opacity-50">
                                     👁️ {showPreview ? 'Ẩn xem trước' : 'Xem trước'}
                                 </button>
-                                <button type="submit" disabled={submitting || (mode === 'upload' && !parsedHtml)} className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/20 transition disabled:opacity-50 text-sm">
-                                    {submitting ? 'Đang lưu...' : 'Đăng bài'}
+                                <button type="submit" disabled={submitting || (mode === 'upload' && !parsedHtml && !editingId)} className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/20 transition disabled:opacity-50 text-sm">
+                                    {submitting ? 'Đang lưu...' : (editingId ? 'Cập nhật' : 'Đăng bài')}
                                 </button>
                             </div>
                         </form>

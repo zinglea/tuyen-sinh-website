@@ -2,12 +2,14 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/utils/supabase/client'
-import { Trash2, X, FileText, Upload, Calendar, Cloud, Server, Eye, Download, Edit } from 'lucide-react'
+import { Trash2, X, FileText, Upload, Calendar, Cloud, Server, Eye, Download, Edit, Search } from 'lucide-react'
+import { maskSupabaseUrl } from '@/utils/maskUrl'
 
 interface DocumentItem {
     id: string
     title: string
     file_url: string
+    raw_file_url?: string
     file_type: string | null
     category: string | null
     created_at: string
@@ -43,6 +45,8 @@ export default function AdminDocumentsPage() {
     const [showModal, setShowModal] = useState(false)
     const [submitting, setSubmitting] = useState(false)
     const [uploadProgress, setUploadProgress] = useState('')
+    const [searchTerm, setSearchTerm] = useState('')
+    const [editingId, setEditingId] = useState<string | null>(null)
     const fileRef = useRef<HTMLInputElement>(null)
 
     // Form fields
@@ -62,7 +66,12 @@ export default function AdminDocumentsPage() {
     const fetchAll = async () => {
         setLoading(true)
         const { data: sbData } = await supabase.from('documents').select('*').order('created_at', { ascending: false })
-        const supabaseItems: DocumentItem[] = (sbData || []).map((d: any) => ({ ...d, source: 'supabase' as const }))
+        const supabaseItems: DocumentItem[] = (sbData || []).map((d: any) => ({
+            ...d,
+            source: 'supabase' as const,
+            file_url: maskSupabaseUrl(d.file_url) as string,
+            raw_file_url: d.file_url
+        }))
 
         let localItems: DocumentItem[] = []
         try {
@@ -89,32 +98,53 @@ export default function AdminDocumentsPage() {
         setDocumentNumber(''); setTitle(''); setSummary(''); setCategory('Công văn')
         setIssuingAuthority(''); setPublishingLevel('Địa phương')
         setIssuedDate(''); setEffectiveDate(''); setDocStatus('Còn hiệu lực')
-        setSelectedFile(null); if (fileRef.current) fileRef.current.value = ''
+        setSelectedFile(null); setEditingId(null); if (fileRef.current) fileRef.current.value = ''
+    }
+
+    const handleEdit = (doc: DocumentItem) => {
+        setEditingId(doc.id)
+        setTitle(doc.title)
+        setDocumentNumber(doc.document_number || '')
+        setSummary(doc.summary || '')
+        setCategory(doc.category || 'Công văn')
+        setIssuingAuthority(doc.issuing_authority || '')
+        setPublishingLevel(doc.publishing_level || 'Địa phương')
+        setIssuedDate(doc.issued_date || '')
+        setEffectiveDate(doc.effective_date || '')
+        setDocStatus(doc.status || 'Còn hiệu lực')
+        setSelectedFile(null)
+        if (fileRef.current) fileRef.current.value = ''
+        setShowModal(true)
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!selectedFile) { alert('Chọn file để upload.'); return }
+        if (!selectedFile && !editingId) { alert('Chọn file để upload.'); return }
         setSubmitting(true)
-        setUploadProgress('Đang upload file...')
 
-        const fileExt = selectedFile.name.split('.').pop()?.toLowerCase() || ''
-        const fileName = `${Date.now()}_${selectedFile.name}`
+        let fileUrl = ''
+        let fileExt = ''
 
-        const { error: uploadError } = await supabase.storage
-            .from('tuyensinh_files').upload(fileName, selectedFile, { cacheControl: '3600', upsert: false })
+        if (selectedFile) {
+            setUploadProgress('Đang upload file...')
+            fileExt = selectedFile.name.split('.').pop()?.toLowerCase() || ''
+            const fileName = `${Date.now()}_${selectedFile.name}`
 
-        if (uploadError) {
-            alert('Lỗi upload: ' + uploadError.message); setSubmitting(false); setUploadProgress(''); return
+            const { error: uploadError } = await supabase.storage
+                .from('tuyensinh_files').upload(fileName, selectedFile, { cacheControl: '3600', upsert: false })
+
+            if (uploadError) {
+                alert('Lỗi upload: ' + uploadError.message); setSubmitting(false); setUploadProgress(''); return
+            }
+
+            const { data: urlData } = supabase.storage.from('tuyensinh_files').getPublicUrl(fileName)
+            fileUrl = urlData.publicUrl
         }
 
-        const { data: urlData } = supabase.storage.from('tuyensinh_files').getPublicUrl(fileName)
         setUploadProgress('Đang lưu vào Database...')
 
-        const { error: dbError } = await supabase.from('documents').insert({
+        const payload: any = {
             title,
-            file_url: urlData.publicUrl,
-            file_type: fileExt,
             category,
             document_number: documentNumber || null,
             summary: summary || null,
@@ -123,7 +153,21 @@ export default function AdminDocumentsPage() {
             issued_date: issuedDate || null,
             effective_date: effectiveDate || null,
             status: docStatus || null,
-        })
+        }
+
+        if (fileUrl) {
+            payload.file_url = fileUrl
+            payload.file_type = fileExt
+        }
+
+        let dbError = null
+        if (editingId) {
+            const { error } = await supabase.from('documents').update(payload).eq('id', editingId)
+            dbError = error
+        } else {
+            const { error } = await supabase.from('documents').insert(payload)
+            dbError = error
+        }
 
         if (dbError) alert('Lỗi DB: ' + dbError.message)
         else { setShowModal(false); resetForm(); fetchAll() }
@@ -135,7 +179,8 @@ export default function AdminDocumentsPage() {
             alert('Văn bản local — hãy xóa file gốc trên máy chủ.'); return
         }
         if (!confirm(`Xóa "${doc.title}"?`)) return
-        const urlParts = doc.file_url.split('/')
+        const targetUrl = doc.raw_file_url || doc.file_url
+        const urlParts = targetUrl.split('/')
         await supabase.storage.from('tuyensinh_files').remove([urlParts[urlParts.length - 1]])
         const { error } = await supabase.from('documents').delete().eq('id', doc.id)
         if (!error) fetchAll()
@@ -147,7 +192,7 @@ export default function AdminDocumentsPage() {
 
     return (
         <div className="p-6 md:p-8">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
                 <div>
                     <h1 className="text-2xl font-extrabold text-slate-800">Quản lý Văn bản</h1>
                     <p className="text-slate-500 text-sm mt-1">
@@ -155,9 +200,15 @@ export default function AdminDocumentsPage() {
                         {localCount > 0 && <> · <span className="text-amber-600 font-medium">{localCount} Local</span></>}
                     </p>
                 </div>
-                <button onClick={() => setShowModal(true)} className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/20 transition-all">
-                    <Upload className="w-5 h-5" /> Upload văn bản
-                </button>
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                    <div className="relative flex-1 sm:w-64">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <input type="text" placeholder="Tìm kiếm văn bản..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition" />
+                    </div>
+                    <button onClick={() => { resetForm(); setShowModal(true) }} className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/20 transition-all shrink-0">
+                        <Upload className="w-5 h-5" /> Upload văn bản
+                    </button>
+                </div>
             </div>
 
             {/* Documents List */}
@@ -170,7 +221,7 @@ export default function AdminDocumentsPage() {
                     </div>
                 ) : (
                     <div className="divide-y divide-slate-100">
-                        {docs.map((doc) => (
+                        {docs.filter(d => d.title.toLowerCase().includes(searchTerm.toLowerCase())).map((doc) => (
                             <div key={`${doc.source}-${doc.id}`} className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50/50 transition">
                                 <div className={`w-12 h-12 rounded-xl ${FILE_COLORS[doc.file_type || ''] || 'bg-slate-400'} flex items-center justify-center shrink-0 shadow-sm`}>
                                     <span className="text-white text-xs font-extrabold uppercase">{doc.file_type || '?'}</span>
@@ -201,6 +252,7 @@ export default function AdminDocumentsPage() {
                                 <div className="flex items-center gap-1.5 shrink-0">
                                     <button onClick={() => window.open(doc.source === 'local' && doc.slug ? `/tin-tuc/${doc.slug}` : doc.file_url, '_blank')} className="p-2 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Xem"><Eye className="w-4 h-4" /></button>
                                     {doc.source === 'supabase' && <a href={doc.file_url} download className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition" title="Tải"><Download className="w-4 h-4" /></a>}
+                                    {doc.source === 'supabase' && <button onClick={() => handleEdit(doc)} className="p-2 text-orange-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition" title="Sửa"><Edit className="w-4 h-4" /></button>}
                                     <button onClick={() => handleDelete(doc)} className={`p-2 rounded-lg transition ${doc.source === 'supabase' ? 'text-red-400 hover:text-red-600 hover:bg-red-50' : 'text-slate-300 cursor-not-allowed'}`}><Trash2 className="w-4 h-4" /></button>
                                 </div>
                             </div>
@@ -214,7 +266,7 @@ export default function AdminDocumentsPage() {
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 sticky top-0 bg-white rounded-t-2xl z-10">
-                            <h2 className="text-lg font-bold text-slate-800">Upload văn bản mới</h2>
+                            <h2 className="text-lg font-bold text-slate-800">{editingId ? 'Sửa văn bản' : 'Upload văn bản mới'}</h2>
                             <button onClick={() => { setShowModal(false); resetForm() }} className="p-1 hover:bg-slate-100 rounded-lg transition"><X className="w-5 h-5 text-slate-400" /></button>
                         </div>
                         <form onSubmit={handleSubmit} className="p-6 space-y-4">
@@ -278,8 +330,8 @@ export default function AdminDocumentsPage() {
 
                             {/* File */}
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Chọn file đính kèm *</label>
-                                <input ref={fileRef} type="file" accept=".pdf,.docx,.doc,.xlsx,.xls,.pptx,.ppt" onChange={e => setSelectedFile(e.target.files?.[0] || null)} required className="w-full text-sm text-slate-600 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer" />
+                                <label className="block text-sm font-semibold text-slate-700 mb-1.5">{editingId ? 'Thay đổi file đính kèm (không bắt buộc)' : 'Chọn file đính kèm *'}</label>
+                                <input ref={fileRef} type="file" accept=".pdf,.docx,.doc,.xlsx,.xls,.pptx,.ppt" onChange={e => setSelectedFile(e.target.files?.[0] || null)} required={!editingId} className="w-full text-sm text-slate-600 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer" />
                                 {selectedFile && <p className="text-xs text-slate-400 mt-1.5">📎 {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)</p>}
                             </div>
 
@@ -292,7 +344,7 @@ export default function AdminDocumentsPage() {
                             <div className="flex gap-3 pt-2">
                                 <button type="button" onClick={() => { setShowModal(false); resetForm() }} className="flex-1 py-2.5 border border-slate-200 text-slate-600 font-semibold rounded-xl hover:bg-slate-50 transition text-sm">Hủy</button>
                                 <button type="submit" disabled={submitting} className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/20 transition disabled:opacity-50 text-sm">
-                                    {submitting ? 'Đang upload...' : 'Upload & Lưu'}
+                                    {submitting ? 'Đang cập nhật...' : (editingId ? 'Cập nhật' : 'Upload & Lưu')}
                                 </button>
                             </div>
                         </form>
