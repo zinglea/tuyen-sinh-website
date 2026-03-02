@@ -4,7 +4,7 @@ import { useRef, useCallback, useState } from 'react'
 import {
     Bold, Italic, Underline, List, ListOrdered,
     Heading1, Heading2, AlignLeft, AlignCenter, AlignRight,
-    Link2, Image, Minus, Undo, Redo, Type, Smile
+    Link2, Image, Minus, Undo, Redo, Type, Smile, PlusCircle, MinusCircle, Palette
 } from 'lucide-react'
 
 interface RichEditorProps {
@@ -54,6 +54,15 @@ export default function RichEditor({ value, onChange, placeholder }: RichEditorP
         handleInput()
     }
 
+    const changeColor = () => {
+        const color = prompt('Nhập mã màu (VD: red, #ff0000, rgb(255,0,0)):')
+        if (color) exec('foreColor', color)
+    }
+
+    const changeFontSize = (size: string) => {
+        exec('fontSize', size)
+    }
+
     const toolbarGroups = [
         {
             label: 'Hoàn tác',
@@ -68,14 +77,16 @@ export default function RichEditor({ value, onChange, placeholder }: RichEditorP
                 { icon: <Bold className="w-4 h-4" />, cmd: 'bold', title: 'In đậm (Ctrl+B)' },
                 { icon: <Italic className="w-4 h-4" />, cmd: 'italic', title: 'In nghiêng (Ctrl+I)' },
                 { icon: <Underline className="w-4 h-4" />, cmd: 'underline', title: 'Gạch chân (Ctrl+U)' },
+                { icon: <Palette className="w-4 h-4 text-orange-500" />, action: changeColor, title: 'Màu chữ' },
             ]
         },
         {
-            label: 'Tiêu đề',
+            label: 'Cỡ & Tiêu đề',
             buttons: [
-                { icon: <Type className="w-4 h-4" />, cmd: 'formatBlock', val: 'p', title: 'Văn bản thường' },
-                { icon: <Heading1 className="w-4 h-4" />, cmd: 'formatBlock', val: 'h2', title: 'Tiêu đề lớn' },
-                { icon: <Heading2 className="w-4 h-4" />, cmd: 'formatBlock', val: 'h3', title: 'Tiêu đề nhỏ' },
+                { icon: <MinusCircle className="w-4 h-4" />, action: () => changeFontSize('2'), title: 'Chữ nhỏ' },
+                { icon: <Type className="w-4 h-4" />, action: () => changeFontSize('3'), title: 'Chữ thường' },
+                { icon: <PlusCircle className="w-4 h-4 text-blue-500" />, action: () => changeFontSize('5'), title: 'Chữ to' },
+                { icon: <Heading1 className="w-4 h-4 text-purple-600" />, cmd: 'formatBlock', val: 'h2', title: 'Tiêu đề lớn' },
             ]
         },
         {
@@ -183,13 +194,14 @@ export default function RichEditor({ value, onChange, placeholder }: RichEditorP
                         const cleaned = html
                             .replace(/<meta[^>]*>/gi, '')
                             .replace(/<link[^>]*>/gi, '')
-                            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+                            // Optional: Removing <style> to prevent overriding global styles, but keeping inline style="..."
+                            // .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
                             .replace(/class="[^"]*"/gi, '')
-                            .replace(/style="[^"]*"/gi, '')
+                            // DON'T STRIP inline style="": .replace(/style="[^"]*"/gi, '')
                             .replace(/<o:p>[\s\S]*?<\/o:p>/gi, '')
                             .replace(/<!--[\s\S]*?-->/g, '')
-                            .replace(/<\/?span[^>]*>/gi, '')
-                            .replace(/<\/?font[^>]*>/gi, '')
+                            // .replace(/<\/?span[^>]*>/gi, '') // SPAN contains colors and font-sizes usually
+                            .replace(/<\/?font(?!\s)[^>]*>/gi, '') // Keep <font> maybe? ExecCommand uses <font size="..."> sometimes.
                         document.execCommand('insertHTML', false, cleaned)
                     } else {
                         document.execCommand('insertText', false, text)
@@ -197,15 +209,15 @@ export default function RichEditor({ value, onChange, placeholder }: RichEditorP
                     handleInput()
                 }}
                 dangerouslySetInnerHTML={{ __html: value }}
-                className="min-h-[300px] max-h-[500px] overflow-y-auto px-4 py-3 text-sm text-slate-800 focus:outline-none prose prose-sm max-w-none
-          [&_h2]:text-lg [&_h2]:font-bold [&_h2]:text-slate-800 [&_h2]:mt-4 [&_h2]:mb-2
-          [&_h3]:text-base [&_h3]:font-bold [&_h3]:text-slate-700 [&_h3]:mt-3 [&_h3]:mb-1.5
+                className="min-h-[400px] max-h-[600px] overflow-y-auto px-5 py-4 text-base text-slate-800 focus:outline-none prose max-w-none
+          [&_h2]:text-xl [&_h2]:font-bold [&_h2]:text-slate-800 [&_h2]:mt-4 [&_h2]:mb-2
+          [&_h3]:text-lg [&_h3]:font-bold [&_h3]:text-slate-700 [&_h3]:mt-3 [&_h3]:mb-1.5
           [&_p]:mb-2 [&_p]:leading-relaxed
           [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:mb-2
           [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:mb-2
           [&_li]:mb-1
           [&_a]:text-blue-600 [&_a]:underline
-          [&_img]:max-w-full [&_img]:rounded-lg [&_img]:my-2
+          [&_img]:max-w-full [&_img]:rounded-lg [&_img]:mx-auto [&_img]:my-3 [&_img]:shadow-sm
           [&_hr]:my-4 [&_hr]:border-slate-200
         "
                 data-placeholder={placeholder || 'Soạn nội dung bài viết tại đây...'}

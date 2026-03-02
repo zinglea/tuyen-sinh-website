@@ -62,12 +62,6 @@ export default async function NewsDetail({ params }: { params: Promise<{ slug: s
                                 <Calendar className="w-4 h-4" />
                                 {formattedDate}
                             </span>
-                            {article.author && (
-                                <span className="text-slate-500 font-medium flex items-center gap-1.5 md:gap-2 border-l border-slate-300 pl-2 md:pl-3 text-xs md:text-sm">
-                                    <GraduationCap className="w-4 h-4" />
-                                    {article.author}
-                                </span>
-                            )}
                         </div>
 
                         {/* Title */}
@@ -85,7 +79,7 @@ export default async function NewsDetail({ params }: { params: Promise<{ slug: s
                                 </div>
                             </div>
                         ) : article.contentType === 'supabase_news' ? (
-                            <div className="prose prose-slate prose-lg max-w-none text-justify article-content
+                            <div className="prose prose-slate max-w-none text-justify article-content
                                 prose-headings:font-bold prose-headings:text-police-dark 
                                 prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline
                                 prose-img:rounded-xl prose-img:shadow-md prose-img:mx-auto"
@@ -94,8 +88,18 @@ export default async function NewsDetail({ params }: { params: Promise<{ slug: s
                             <PptxSlideNav contentHtml={article.contentHtml} />
                         )}
 
+                        {/* Author at the bottom */}
+                        {article.author && (
+                            <div className="mt-10 mb-4 text-right">
+                                <p className="text-base md:text-lg font-bold text-slate-800">
+                                    <span className="italic text-slate-500 font-normal text-sm block mb-1">Tác giả bài viết</span>
+                                    {article.author.toUpperCase()}
+                                </p>
+                            </div>
+                        )}
+
                         {/* Social share + CTA */}
-                        <div className="mt-8 md:mt-12 pt-6 md:pt-8 border-t border-slate-200">
+                        <div className="mt-8 pt-6 md:pt-8 border-t border-slate-200">
                             {/* Social links */}
                             <div className="flex flex-wrap gap-3 mb-6">
                                 <a
