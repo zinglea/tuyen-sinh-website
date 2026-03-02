@@ -77,12 +77,12 @@ export default function Header() {
                                     <span className="absolute -bottom-[1px] left-0 w-0 h-1 bg-police-accent rounded-t-md opacity-0 group-hover:w-full group-hover:opacity-100 transition-all duration-300"></span>
                                 </span>
                                 {/* Dropdown */}
-                                <div className="absolute left-0 mt-0 w-56 bg-white border border-slate-100 shadow-xl rounded-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform origin-top-left -translate-y-2 group-hover:translate-y-0 z-50 overflow-hidden">
+                                <div className="absolute left-0 mt-0 w-72 bg-white border border-slate-100 shadow-xl rounded-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform origin-top-left -translate-y-2 group-hover:translate-y-0 z-50 overflow-hidden">
                                     <Link href="/tien-ich/suc-khoe" className="block px-4 py-3 text-sm font-bold text-slate-700 hover:bg-police-50 hover:text-police-dark transition-colors border-b border-slate-50">
-                                        Tiêu chuẩn Sức khỏe
+                                        Tiêu chuẩn sức khỏe tuyển sinh, tuyển mới vào CAND
                                     </Link>
                                     <Link href="/tien-ich/danh-ba-truong" className="block px-4 py-3 text-sm font-bold text-slate-700 hover:bg-police-50 hover:text-police-dark transition-colors">
-                                        Danh bạ Trường CAND
+                                        Danh sách các trường CAND
                                     </Link>
                                 </div>
                             </li>

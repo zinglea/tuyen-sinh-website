@@ -65,7 +65,7 @@ export default function SchoolDirectoryPage() {
             <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
                 <div className="text-center mb-10">
                     <h1 className="text-3xl md:text-4xl font-extrabold text-police-dark mb-4 uppercase tracking-tight">
-                        Danh bạ Trường CAND
+                        Danh sách các trường CAND
                     </h1>
                     <p className="text-slate-600 max-w-2xl mx-auto">
                         Tra cứu thông tin tuyển sinh, khối thi và các quy định của các Học viện, Trường Đại học, Cao đẳng trong hệ thống Công an nhân dân.

@@ -199,7 +199,7 @@ const HealthCheckCAND = () => {
             <div className={`p-6 rounded-2xl border-2 ${result.passed ? 'border-emerald-400 bg-emerald-50' : 'border-rose-400 bg-rose-50'}`}>
                 <div className="flex items-center space-x-4 mb-4">
                     <div className={`text-5xl ${result.passed ? 'text-emerald-500' : 'text-rose-500'}`}>
-                        {result.passed ? '😎' : '😥'}
+                        {result.passed ? '👮‍♂️ ✅' : '👮‍♂️ ❌'}
                     </div>
                     <div>
                         <h3 className={`text-xl lg:text-2xl font-extrabold ${result.passed ? 'text-emerald-700' : 'text-rose-700'}`}>

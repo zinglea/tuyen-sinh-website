@@ -17,7 +17,7 @@ const navItems = [
     { href: '/admin', label: 'Tổng quan', icon: LayoutDashboard },
     { href: '/admin/news', label: 'Tin tức', icon: Newspaper },
     { href: '/admin/documents', label: 'Văn bản', icon: FileText },
-    { href: '/admin/schools', label: 'Danh bạ trường', icon: GraduationCap },
+    { href: '/admin/schools', label: 'Danh sách trường', icon: GraduationCap },
 ]
 
 export default function AdminLayout({

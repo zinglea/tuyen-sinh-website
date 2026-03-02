@@ -121,7 +121,7 @@ export default function AdminSchools() {
         <div className="p-6 md:p-8">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
                 <div>
-                    <h1 className="text-2xl font-extrabold text-slate-800">Danh bạ Trường CAND</h1>
+                    <h1 className="text-2xl font-extrabold text-slate-800">Danh sách các trường CAND</h1>
                     <p className="text-slate-500 text-sm mt-1">Quản lý danh sách, khối thi, chỉ tiêu các trường khối Công an</p>
                 </div>
                 <div className="flex items-center gap-3 w-full sm:w-auto">

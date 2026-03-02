@@ -143,21 +143,21 @@ export default async function Home() {
                     </Link>
                   </li>
                   <li>
-                    <Link href="#" className="flex items-center gap-4 px-4 py-3.5 rounded-2xl hover:bg-slate-50/80 hover:shadow-sm text-slate-600 hover:text-police-light transition-all group">
+                    <Link href="/tien-ich/suc-khoe" className="flex items-center gap-4 px-4 py-3.5 rounded-2xl hover:bg-slate-50/80 hover:shadow-sm text-slate-600 hover:text-police-light transition-all group">
                       <div className="bg-slate-100 p-2 rounded-xl group-hover:bg-police-100 group-hover:text-police-light transition-colors">
                         <FileText className="w-5 h-5 text-slate-400 group-hover:text-police-light" />
                       </div>
-                      <span className="font-semibold text-sm">Quy chuẩn sức khỏe Công an</span>
-                      <ChevronRight className="w-4 h-4 ml-auto text-slate-300 group-hover:text-police-light transition-transform group-hover:translate-x-1" />
+                      <span className="font-semibold text-sm line-clamp-2">Tiêu chuẩn sức khỏe tuyển sinh, tuyển mới vào CAND</span>
+                      <ChevronRight className="w-4 h-4 ml-auto text-slate-300 group-hover:text-police-light transition-transform group-hover:translate-x-1 shrink-0" />
                     </Link>
                   </li>
                   <li>
-                    <Link href="#" className="flex items-center gap-4 px-4 py-3.5 rounded-2xl hover:bg-slate-50/80 hover:shadow-sm text-slate-600 hover:text-police-light transition-all group">
+                    <Link href="/tien-ich/danh-ba-truong" className="flex items-center gap-4 px-4 py-3.5 rounded-2xl hover:bg-slate-50/80 hover:shadow-sm text-slate-600 hover:text-police-light transition-all group">
                       <div className="bg-slate-100 p-2 rounded-xl group-hover:bg-police-100 group-hover:text-police-light transition-colors">
                         <FileText className="w-5 h-5 text-slate-400 group-hover:text-police-light" />
                       </div>
                       <span className="font-semibold text-sm">Danh sách các trường CAND</span>
-                      <ChevronRight className="w-4 h-4 ml-auto text-slate-300 group-hover:text-police-light transition-transform group-hover:translate-x-1" />
+                      <ChevronRight className="w-4 h-4 ml-auto text-slate-300 group-hover:text-police-light transition-transform group-hover:translate-x-1 shrink-0" />
                     </Link>
                   </li>
                 </ul>
