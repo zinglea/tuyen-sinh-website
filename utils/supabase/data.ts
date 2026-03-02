@@ -7,6 +7,7 @@ export interface SupabaseNewsItem {
     content: string | null
     image_url: string | null
     author: string
+    category: string | null
     created_at: string
 }
 

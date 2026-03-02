@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { MessageCircle, Calendar, ChevronRight, FileText, Bot, ArrowRight, Phone, Mail, MapPin } from 'lucide-react'
 import { getAllNews } from '@/utils/docxParser'
+import { getSupabaseNews } from '@/utils/supabase/data'
 import NewsCarousel from '@/components/NewsCarousel'
 import ScoreCalculator from '@/components/ScoreCalculator'
 import VisitorCounter from '@/components/VisitorCounter'
@@ -9,10 +10,30 @@ import Header from '@/components/Header'
 export const dynamic = 'force-dynamic'
 
 export default async function Home() {
-  const allData = await getAllNews()
+  const [allData, supabaseNews] = await Promise.all([
+    getAllNews(),
+    getSupabaseNews(),
+  ])
+
   // Filter out raw documents so they don't appear in the main News section
-  const newsData = allData.filter(article => article.contentType !== 'raw_document')
-  const topNews = newsData.slice(0, 5)
+  const localNews = allData.filter(article => article.contentType !== 'raw_document')
+
+  // Convert Supabase news to same format as local news
+  const supabaseFormatted = supabaseNews.map(item => ({
+    id: item.id,
+    slug: `supabase-${item.id}`,
+    title: item.title,
+    date: item.created_at,
+    category: item.category || 'Tin tức',
+    excerpt: item.content?.substring(0, 150) || '',
+    image: item.image_url || '/logo.png',
+    contentType: 'supabase_news' as const,
+    author: item.author || 'Admin',
+    contentHtml: '',
+  }))
+
+  const combinedNews = [...supabaseFormatted, ...localNews]
+  const topNews = combinedNews.slice(0, 5)
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans selection:bg-police-dark selection:text-white">

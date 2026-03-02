@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
     const { data: matchedDocs, error: matchError } = await supabase.rpc('match_documents', {
       query_embedding: queryVector,
       match_threshold: 0.5, // Ngưỡng độ chính xác (0.0 đến 1.0)
-      match_count: 5        // Lấy 5 đoạn văn bản gần nhất
+      match_count: 8        // Lấy 8 đoạn văn bản gần nhất
     });
 
     if (matchError) {

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { ArrowLeft, Calendar, GraduationCap, Eye, Share2 } from 'lucide-react'
 import { getNewsBySlug, getAllNews } from '@/utils/docxParser'
+import { createClient } from '@/utils/supabase/server'
 import { notFound } from 'next/navigation'
 import PptxSlideNav from '@/components/PptxSlideNav'
 import Header from '@/components/Header'
@@ -11,7 +12,30 @@ export const dynamic = 'force-dynamic'
 
 export default async function NewsDetail({ params }: { params: Promise<{ slug: string }> }) {
     const resolvedParams = await params;
-    const article = await getNewsBySlug(resolvedParams.slug)
+    const slug = resolvedParams.slug;
+
+    let article: any = null;
+
+    if (slug.startsWith('supabase-')) {
+        const id = slug.replace('supabase-', '');
+        const supabase = await createClient();
+        const { data, error } = await supabase.from('news').select('*').eq('id', id).single();
+        if (data && !error) {
+            article = {
+                id: data.id,
+                title: data.title,
+                date: data.created_at,
+                category: data.category || 'Tin tức',
+                author: data.author || 'Admin',
+                contentType: 'supabase_news',
+                contentHtml: data.content || '',
+                rawFileUrl: '',
+                slug: slug
+            }
+        }
+    } else {
+        article = await getNewsBySlug(slug)
+    }
 
     if (!article) {
         notFound()
@@ -51,7 +75,6 @@ export default async function NewsDetail({ params }: { params: Promise<{ slug: s
                             {article.title}
                         </h1>
 
-                        {/* Content - conditionally render safe PDF Viewer or normal content */}
                         {article.contentType === 'raw_document' && article.rawFileUrl?.toLowerCase().endsWith('.pdf') ? (
                             <div className="flex flex-col gap-6">
                                 <PdfViewerClient fileUrl={`/api/pdf?file=${encodeURIComponent(article.rawFileUrl.split('/').pop() || '')}`} />
@@ -61,6 +84,12 @@ export default async function NewsDetail({ params }: { params: Promise<{ slug: s
                                     </a>
                                 </div>
                             </div>
+                        ) : article.contentType === 'supabase_news' ? (
+                            <div className="prose prose-slate prose-lg max-w-none text-justify article-content
+                                prose-headings:font-bold prose-headings:text-police-dark 
+                                prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline
+                                prose-img:rounded-xl prose-img:shadow-md prose-img:mx-auto"
+                                dangerouslySetInnerHTML={{ __html: article.contentHtml }} />
                         ) : (
                             <PptxSlideNav contentHtml={article.contentHtml} />
                         )}

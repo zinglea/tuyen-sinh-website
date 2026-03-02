@@ -22,7 +22,7 @@ export default async function TinTuc() {
     slug: `supabase-${item.id}`,
     title: item.title,
     date: item.created_at,
-    category: 'Tin tức',
+    category: item.category || 'Tin tức',
     excerpt: item.content?.substring(0, 150) || '',
     image: item.image_url || '/logo.png',
     contentType: 'supabase_news' as const,

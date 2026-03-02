@@ -58,7 +58,7 @@ export default function AdminNewsPage() {
     const fetchAll = async () => {
         setLoading(true)
         const { data: sbData } = await supabase.from('news').select('*').order('created_at', { ascending: false })
-        const supabaseItems: NewsItem[] = (sbData || []).map((item: any) => ({ ...item, source: 'supabase' as const }))
+        const supabaseItems: NewsItem[] = (sbData || []).map((item: any) => ({ ...item, source: 'supabase' as const, category: item.category || 'Tin tức' }))
 
         let localItems: NewsItem[] = []
         try {
@@ -170,6 +170,7 @@ export default function AdminNewsPage() {
             title,
             content: finalContent,
             author,
+            category,
             image_url: imageUrl || null,
         })
 
@@ -195,7 +196,7 @@ export default function AdminNewsPage() {
     const handleMigrateToCloud = async (item: NewsItem) => {
         if (item.source !== 'local') return
         setMigrating(item.id)
-        const { error } = await supabase.from('news').insert({ title: item.title, content: item.content, author: item.author })
+        const { error } = await supabase.from('news').insert({ title: item.title, content: item.content, author: item.author, category: item.category || 'Tin tức' })
         if (!error) { alert('✅ Đã đẩy lên Cloud!'); fetchAll() }
         else alert('Lỗi: ' + error.message)
         setMigrating(null)
@@ -249,6 +250,7 @@ export default function AdminNewsPage() {
                                         )}
                                     </div>
                                     <div className="flex items-center gap-3 text-xs text-slate-400">
+                                        <span className="flex items-center gap-1 font-semibold text-slate-500">{item.category}</span>
                                         <span className="flex items-center gap-1"><User className="w-3 h-3" />{item.author}</span>
                                         <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{new Date(item.created_at).toLocaleDateString('vi-VN')}</span>
                                     </div>

@@ -48,7 +48,7 @@ async function processDocument(filePath: string): Promise<void> {
   }
 
   const stat = fs.statSync(filePath);
-  const docId = `doc_${filename}_${Date.now()}`;
+  const docId = `doc_${filename.replace(/\.[^/.]+$/, "")}`; // Removes original extension
 
   const processedDoc = {
     id: docId,

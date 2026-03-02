@@ -15,14 +15,14 @@ async function run() {
 
         console.log("Embedding query...");
         const model = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
-        const res = await model.embedContent("điểm xét tuyển bằng bao nhiêu");
+        const res = await model.embedContent("phân biệt điểm khác nhau giữa quy định về bài thi bộ công an năm 2024 và 2025");
         console.log("Query vector length:", res.embedding.values.length);
 
         console.log("Matching...");
         const { data, error } = await supabase.rpc('match_documents', {
             query_embedding: res.embedding.values,
             match_threshold: 0.1, // Set lower threshold for testing
-            match_count: 2
+            match_count: 10
         });
 
         if (error) {
@@ -30,10 +30,15 @@ async function run() {
         } else {
             console.log("Matches found:", data?.length || 0);
             if (data && data.length > 0) {
-                data.forEach((d: any, i: number) => {
-                    console.log(`\n--- Match ${i + 1} (Score: ${d.similarity}) ---`);
-                    console.log(d.content.substring(0, 150) + "...");
-                });
+                const fs = require('fs');
+                const output = data.map((d: any, i: number) => ({
+                    rank: i + 1,
+                    score: d.similarity,
+                    source: d.metadata.source,
+                    content: d.content.substring(0, 50).replace(/\n/g, " ")
+                }));
+                fs.writeFileSync('matches.json', JSON.stringify(output, null, 2));
+                console.log("Wrote matches to matches.json");
             }
         }
     } catch (e: any) {
