@@ -37,7 +37,7 @@ const securityHeaders = [
       "img-src 'self' data: blob: https:",
       "media-src 'self' data: blob: https:",
       "frame-src 'self' blob: https://www.youtube.com https://youtube.com https://www.facebook.com https://web.facebook.com",
-      "connect-src 'self' https://generativelanguage.googleapis.com https://www.google-analytics.com https://www.googletagmanager.com https://analytics.google.com",
+      "connect-src 'self' https://generativelanguage.googleapis.com https://www.google-analytics.com https://www.googletagmanager.com https://analytics.google.com https://*.supabase.co",
     ].join('; ')
   }
 ];

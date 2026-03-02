@@ -24,7 +24,7 @@ export interface NewsArticle {
 /**
  * Extract YouTube/video URLs from docx internal relationships (OLE embeds) or direct media files
  */
-async function extractVideoUrlsFromDocx(filePath: string): Promise<string[]> {
+export async function extractVideoUrlsFromDocx(filePath: string): Promise<string[]> {
     const urls: string[] = [];
 
     try {
@@ -77,16 +77,25 @@ async function extractVideoUrlsFromDocx(filePath: string): Promise<string[]> {
 
 /**
  * Extract video URLs from raw text using custom tags
- * Supports: #Video: URL, #video: URL
+ * Supports: #Video: URL, ##URL##
  */
-function extractVideoUrlsFromText(text: string): string[] {
+export function extractVideoUrlsFromText(text: string): string[] {
     const urls: string[] = [];
-
-    // Custom tag: #Video: URL
-    const videoTagPattern = /#[Vv]ideo:\s*(https?:\/\/[^\s]+)/g;
     let match;
+
+    // Legacy: Custom tag: #Video: URL
+    const videoTagPattern = /#[Vv]ideo:\s*(https?:\/\/[^\s]+)/g;
     while ((match = videoTagPattern.exec(text)) !== null) {
         urls.push(match[1]);
+    }
+
+    // New: ##URL## syntax
+    const doublehashPattern = /##(https?:\/\/[^#]+)##/g;
+    while ((match = doublehashPattern.exec(text)) !== null) {
+        const url = match[1].trim();
+        if (!urls.includes(url)) {
+            urls.push(url);
+        }
     }
 
     // Also detect plain YouTube URLs in text
@@ -102,9 +111,31 @@ function extractVideoUrlsFromText(text: string): string[] {
 }
 
 /**
+ * Process ##...## syntax in HTML:
+ * - ##https://...## → video embed
+ * - ##caption text## → styled image caption
+ */
+export function processDoublehashSyntax(html: string): string {
+    // Process ##URL## → video embed
+    html = html.replace(/(?:<p[^>]*>)?\s*##(https?:\/\/[^#]+)##\s*(?:<\/p>)?/gi, (_, url) => {
+        return videoUrlToEmbed(url.trim());
+    });
+
+    // Process ##caption## → styled figcaption (non-URL text between ##)
+    html = html.replace(/(?:<p[^>]*>)?\s*##([^#]+?)##\s*(?:<\/p>)?/gi, (_, caption) => {
+        const trimmed = caption.trim();
+        // Skip if it looks like a URL (already handled above)
+        if (/^https?:\/\//i.test(trimmed)) return _;
+        return `<figure style="text-align:center;margin:0.5em 0 1.5em;"><figcaption style="font-style:italic;color:#64748b;font-size:0.9em;margin-top:0.5em;">${trimmed}</figcaption></figure>`;
+    });
+
+    return html;
+}
+
+/**
  * Convert a video URL to an embeddable iframe HTML
  */
-function videoUrlToEmbed(url: string): string {
+export function videoUrlToEmbed(url: string): string {
     // YouTube
     let videoId = '';
     const ytMatch = url.match(/(?:youtube\.com\/(?:embed\/|watch\?v=|v\/)|youtu\.be\/)([\w-]+)/);
@@ -164,7 +195,7 @@ function videoUrlToEmbed(url: string): string {
  * - Remove OLE video thumbnail images (EMF rendered as images)  
  * - Add video iframe embeds
  */
-function processVideoInHtml(html: string, videoUrls: string[]): string {
+export function processVideoInHtml(html: string, videoUrls: string[]): string {
     if (videoUrls.length === 0) return html;
 
     let remainingEmbeds: string[] = [];
@@ -335,6 +366,9 @@ export async function getAllNews(): Promise<NewsArticle[]> {
             }
             html = html.replace(/<p[^>]*>.*?#n[ộoiỉ]\s*dung:.*?<\/p>/ig, '');
             html = html.replace(/<h[1-6][^>]*>.*?#n[ộoiỉ]\s*dung:.*?<\/h[1-6]>/ig, '');
+
+            // Process ##caption## and ##videoUrl## syntax
+            html = processDoublehashSyntax(html);
 
             articles.push({
                 id: slug,

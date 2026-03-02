@@ -1,7 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { NextRequest, NextResponse } from 'next/server'
-import fs from 'fs'
-import path from 'path'
+import { createClient } from '@supabase/supabase-js'
 
 // Vercel serverless function timeout (seconds)
 export const maxDuration = 30;
@@ -14,24 +13,6 @@ const WINDOW_MS = 60 * 1000;
 // Conversation history (in-memory)
 const conversationStore = new Map<string, { role: string, content: string }[]>();
 const MAX_HISTORY = 10;
-
-// Load knowledge base once (cached across requests in same instance)
-let knowledgeBase = '';
-function getKnowledgeBase(): string {
-  if (knowledgeBase) return knowledgeBase;
-
-  try {
-    const kbPath = path.join(process.cwd(), 'data', 'rag', 'knowledge.txt');
-    if (fs.existsSync(kbPath)) {
-      knowledgeBase = fs.readFileSync(kbPath, 'utf-8');
-      console.log(`[Chat] Loaded knowledge base: ${Math.round(knowledgeBase.length / 1024)}KB`);
-    }
-  } catch (error) {
-    console.error('[Chat] Failed to load knowledge base:', error);
-  }
-
-  return knowledgeBase;
-}
 
 const SYSTEM_PROMPT = `
 BẠN LÀ TRỢ LÝ AI TƯ VẤN TUYỂN SINH CỦA CÔNG AN TỈNH CAO BẰNG - PHÒNG TỔ CHỨC CÁN BỘ.
@@ -85,6 +66,20 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      console.error("Missing Supabase credentials");
+      return NextResponse.json({
+        response: 'Lỗi: Hệ thống chưa cấu hình Database. Vui lòng liên hệ Admin.',
+        sessionId: null
+      });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    const genAI = new GoogleGenerativeAI(apiKey);
+
     const sessionId = clientSessionId || `session_${ip}_${Date.now()}`;
 
     // Get conversation history
@@ -102,11 +97,31 @@ export async function POST(req: NextRequest) {
         ).join('\n') + '\n';
     }
 
-    // Load knowledge base
-    const kb = getKnowledgeBase();
-    const knowledgeContext = kb
-      ? `\n\nDƯỚI ĐÂY LÀ TÀI LIỆU HƯỚNG DẪN TUYỂN SINH CHÍNH THỨC (BỘ CÔNG AN). Hãy dựa vào tài liệu này để trả lời:\n\n${kb}\n`
-      : '';
+    // --- VECTOR SEARCH (RAG) ---
+    console.log(`[Chat] Generating embedding for query...`);
+    // 1. Nhúng (Embed) câu hỏi của user
+    const embeddingModel = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
+    const embedResult = await embeddingModel.embedContent(message);
+    const queryVector = embedResult.embedding.values;
+
+    // 2. Tìm kiếm trong Supabase sử dụng RPC match_documents
+    console.log(`[Chat] Querying Supabase vector database...`);
+    const { data: matchedDocs, error: matchError } = await supabase.rpc('match_documents', {
+      query_embedding: queryVector,
+      match_threshold: 0.5, // Ngưỡng độ chính xác (0.0 đến 1.0)
+      match_count: 5        // Lấy 5 đoạn văn bản gần nhất
+    });
+
+    if (matchError) {
+      console.error("Supabase match_documents error:", matchError);
+    }
+
+    // 3. Xây dựng Context từ tài liệu tìm được
+    let knowledgeContext = '';
+    if (matchedDocs && matchedDocs.length > 0) {
+      const docsContent = matchedDocs.map((doc: any, index: number) => `[Tài Liệu ${index + 1}]:\n${doc.content}`).join('\n\n');
+      knowledgeContext = `\n\nDƯỚI ĐÂY LÀ CÁC THÔNG TIN TRÍCH XUẤT TỪ TÀI LIỆU HƯỚNG DẪN TUYỂN SINH. Việc trả lời PHẢI dựa trên thông tin này:\n\n${docsContent}\n`;
+    }
 
     // Build prompt
     const prompt = `${SYSTEM_PROMPT}${knowledgeContext}${conversationContext}\n\nCâu hỏi hiện tại: ${message}\n\nTrả lời:`;
@@ -114,7 +129,6 @@ export async function POST(req: NextRequest) {
     console.log(`[Chat] Prompt size: ${Math.round(prompt.length / 1024)}KB, starting Gemini call at +${Date.now() - startTime}ms`);
 
     // Call Gemini
-    const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
     const result = await model.generateContent(prompt);
