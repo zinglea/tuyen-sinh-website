@@ -21,7 +21,7 @@ export default async function Home() {
   // Convert Supabase news to same format as local news
   const supabaseFormatted = supabaseNews.map(item => ({
     id: item.id,
-    slug: `supabase-${item.id}`,
+    slug: `baiviet-${item.id}`,
     title: item.title,
     date: item.created_at,
     category: item.category || 'Tin tức',

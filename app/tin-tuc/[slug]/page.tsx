@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ArrowLeft, Calendar, GraduationCap, Eye, Share2 } from 'lucide-react'
+import { ArrowLeft, Calendar, GraduationCap, Eye, Share2, PenTool } from 'lucide-react'
 import { getNewsBySlug, getAllNews } from '@/utils/docxParser'
 import { createClient } from '@/utils/supabase/server'
 import { notFound } from 'next/navigation'
@@ -16,8 +16,8 @@ export default async function NewsDetail({ params }: { params: Promise<{ slug: s
 
     let article: any = null;
 
-    if (slug.startsWith('supabase-')) {
-        const id = slug.replace('supabase-', '');
+    if (slug.startsWith('baiviet-')) {
+        const id = slug.replace('baiviet-', '');
         const supabase = await createClient();
         const { data, error } = await supabase.from('news').select('*').eq('id', id).single();
         if (data && !error) {
@@ -90,11 +90,12 @@ export default async function NewsDetail({ params }: { params: Promise<{ slug: s
 
                         {/* Author at the bottom */}
                         {article.author && (
-                            <div className="mt-10 mb-4 text-right">
-                                <p className="text-base md:text-lg font-bold text-slate-800">
-                                    <span className="italic text-slate-500 font-normal text-sm block mb-1">Tác giả bài viết</span>
-                                    {article.author.toUpperCase()}
-                                </p>
+                            <div className="mt-12 flex justify-end">
+                                <div className="inline-flex flex-col items-center bg-slate-50 border border-slate-100 px-8 py-5 rounded-2xl shadow-sm">
+                                    <PenTool className="w-6 h-6 text-slate-400 mb-2" />
+                                    <span className="text-xs uppercase tracking-widest text-slate-500 font-bold mb-1">Tác giả bài viết</span>
+                                    <span className="text-lg font-bold text-police-dark font-serif">{article.author}</span>
+                                </div>
                             </div>
                         )}
 
