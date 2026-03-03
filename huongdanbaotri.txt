@@ -1,0 +1,31 @@
+Hướng dẫn sử dụng tính năng Bảo trì
+Để kích hoạt hay tắt tính năng này, bạn chỉ việc chỉnh sửa 1 từ duy nhất trong tệp 
+
+app/layout.tsx
+:
+
+1. Mở file thư mục chứa công tắc: Tại Code Editor (VS Code), bạn mở file theo đường dẫn: 
+
+app/layout.tsx
+
+2. Kích hoạt Bảo trì (Bật): Hãy tìm đến dòng thứ 18, bạn sẽ thấy đoạn lệnh:
+
+typescript
+const MAINTENANCE_MODE = false;
+Để BẬT chế độ bảo trì toàn bộ Web, bạn chỉ cần sửa chữ false thành chữ true:
+
+typescript
+const MAINTENANCE_MODE = true;
+Lưu ý cho việc đưa lên mạng (Production): Sau khi đổi thành true, nếu bạn đang chạy môi trường test (npm run dev) thì web sẽ ngay lập tức được bảo trì. Còn nếu bạn đang chạy thực trên Server thật, bạn phải đẩy code này lên và chạy lại câu lệnh build quen thuộc (npm run build sau đó chạy lại App) để cập nhật giao diện bảo trì.
+
+3. Tắt Bảo trì (Trở lại bình thường):
+
+Khi đã sửa chữa, nâng cấp xong và muốn Website mở cửa đón thí sinh bình thường, bạn mở lại file 
+
+app/layout.tsx
+ và đánh lại dòng 18 thành chữ false:
+typescript
+const MAINTENANCE_MODE = false;
+(Tiếp tục gọi npm run build nếu đang đưa web lên mạng thật).
+
+Vô cùng đơn giản và an toàn mà không phải sử dụng lệnh gõ hệ thống nào! Bạn có thể kiểm tra trực tiếp giao diện Bảo trì của trang mình vừa Build bằng cách sửa chữ true và vào web xem thử nhé!
