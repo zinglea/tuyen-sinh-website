@@ -94,11 +94,17 @@ export default async function NewsDetail({ params }: { params: Promise<{ slug: s
 
                         {/* Author at the bottom */}
                         {article.author && (
-                            <div className="mt-12 mb-8 flex justify-end">
+                            <div className="mt-12 mb-8 flex justify-end print:hidden">
                                 <div className="inline-flex flex-col items-center border-t border-slate-200 pt-6 px-4">
                                     <PenTool className="w-5 h-5 text-slate-400 mb-2 rotate-180" />
                                     <span className="text-[11px] uppercase tracking-[0.2em] text-slate-400 font-bold mb-1">Tác giả bài viết</span>
-                                    <span className="text-lg text-slate-700 font-serif italic">{article.author}</span>
+                                    {/* The text-lg, text-slate-700, and font-serif remain, but we add a specific font stack to fix Vietnamese diacritics in Nguồn */}
+                                    <span
+                                        className="text-lg text-slate-700 italic font-serif"
+                                        style={{ fontFamily: "'Times New Roman', Times, serif" }}
+                                    >
+                                        {article.author.replace(/Nguô\s*`\s*n/g, 'Nguồn')}
+                                    </span>
                                 </div>
                             </div>
                         )}

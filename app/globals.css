@@ -523,3 +523,61 @@ nextjs-portal {
     max-height: 300px;
   }
 }
+
+/* ============================
+   Print Styles
+   ============================ */
+@media print {
+
+  /* Hide all generic UI elements */
+  header,
+  nav,
+  footer,
+  .mt-12.mb-8.flex.justify-end,
+  /* Author box */
+  .border-y.border-slate-100,
+  /* Tags & Share bar */
+  .mt-8.pt-6.border-t.border-slate-200,
+  /* Social CTA */
+  .container.mx-auto.px-4.pb-12,
+  /* Popular news container */
+  .tracking-wide.flex.items-center,
+  /* View counter etc */
+  #nextjs-build-indicator,
+  .fb-comments {
+    display: none !important;
+  }
+
+  /* Reset body and hide background */
+  body {
+    background: none !important;
+    background-color: white !important;
+    color: black !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Make article container full width */
+  article,
+  .max-w-4xl,
+  .container {
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: none !important;
+  }
+
+  /* Print Title settings */
+  h1 {
+    font-size: 24pt !important;
+    page-break-after: avoid;
+  }
+
+  /* Adjust margins for pages */
+  @page {
+    margin: 2cm;
+  }
+}

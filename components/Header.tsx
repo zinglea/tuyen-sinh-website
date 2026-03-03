@@ -65,12 +65,6 @@ export default function Header() {
                                     <span className="absolute -bottom-[1px] left-0 w-0 h-1 bg-police-accent rounded-t-md opacity-0 group-hover:w-full group-hover:opacity-100 transition-all duration-300"></span>
                                 </Link>
                             </li>
-                            <li>
-                                <Link href="/chatbot" className="inline-block py-2 md:py-4 px-2 hover:text-police-light transition-colors relative group">
-                                    Trợ lý AI
-                                    <span className="absolute -bottom-[1px] left-0 w-0 h-1 bg-police-accent rounded-t-md opacity-0 group-hover:w-full group-hover:opacity-100 transition-all duration-300"></span>
-                                </Link>
-                            </li>
                             <li className="relative group">
                                 <span className="inline-block py-2 md:py-4 px-2 hover:text-police-light transition-colors relative cursor-pointer">
                                     Tiện ích ▾

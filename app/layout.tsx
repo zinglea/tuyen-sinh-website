@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
+import FloatingChat from '@/components/FloatingChat'
 
 const inter = Inter({ subsets: ['latin', 'vietnamese'] })
 
@@ -18,8 +19,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="vi">
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        {children}
+        <FloatingChat />
+      </body>
       <GoogleAnalytics gaId="G-TWPX1R9F2P" />
     </html>
   )
 }
+
