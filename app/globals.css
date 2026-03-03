@@ -97,6 +97,13 @@ nextjs-portal {
    DOCX Content Styles
    ============================ */
 
+.docx-content {
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
+  max-width: 100%;
+}
+
 .docx-content p {
   margin-bottom: 1.25rem;
   line-height: 1.8;

@@ -19,7 +19,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="vi">
-      <body className={inter.className}>
+      <body className={`overflow-x-hidden w-full ${inter.className}`}>
         {children}
         <FloatingChat />
       </body>
