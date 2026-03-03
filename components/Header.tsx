@@ -19,8 +19,17 @@ export default function Header() {
     return (
         <header className="bg-white sticky top-0 z-50 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.1)]">
             {/* Top Banner */}
-            <div className="bg-police-dark text-white py-4 md:py-6 relative overflow-hidden">
-                <div className="absolute right-0 top-0 w-1/3 h-full bg-gradient-to-l from-police-light/20 to-transparent skew-x-12 transform translate-x-10"></div>
+            <div
+                className="bg-police-dark text-white py-4 md:py-6 relative overflow-hidden bg-cover bg-[center_10%]"
+                style={{ backgroundImage: "url('/bg-don-vi.jpg')" }}
+            >
+                {/* Các lớp Overlay để làm tối/nhuộm màu chìm ảnh nền vàng */}
+                <div className="absolute inset-0 bg-police-dark/85 mix-blend-multiply"></div>
+                <div className="absolute inset-0 bg-gradient-to-r from-police-dark/95 via-police-dark/80 to-police-light/40"></div>
+
+                {/* Vệt sáng chéo điểm nhấn */}
+                <div className="absolute right-0 top-0 w-1/3 h-full bg-gradient-to-l from-yellow-500/20 to-transparent skew-x-12 transform translate-x-10 blur-sm"></div>
+
                 <div className="container mx-auto px-4 flex items-center justify-center md:justify-start gap-4 md:gap-6 relative z-10">
                     <img src="/logo.png" alt="CAND Logo" className="w-16 h-16 md:w-24 md:h-24 object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]" />
                     <div className="flex flex-col text-center md:text-left">

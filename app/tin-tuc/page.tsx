@@ -34,7 +34,7 @@ export default async function TinTuc() {
   const combinedNews = [...supabaseFormatted, ...localNews]
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-transparent">
       {/* Header */}
       <header className="bg-white shadow-md sticky top-0 z-50">
         <nav className="container mx-auto px-4 py-4">

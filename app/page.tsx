@@ -36,8 +36,7 @@ export default async function Home() {
   const topNews = combinedNews.slice(0, 5)
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans selection:bg-police-dark selection:text-white">
-      {/* Header */}
+    <div className="min-h-screen font-sans selection:bg-police-dark selection:text-white bg-transparent">
       {/* Header */}
       <Header />
 
@@ -172,8 +171,15 @@ export default async function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-police-dark text-white mt-12 relative overflow-hidden">
-        <div className="absolute inset-0 bg-black/10"></div>
+      <footer
+        className="bg-police-dark text-white mt-12 relative overflow-hidden bg-cover bg-[center_10%]"
+        style={{ backgroundImage: "url('/bg-don-vi.jpg')" }}
+      >
+        {/* Lớp phủ mờ chìm ảnh vàng xuống */}
+        <div className="absolute inset-0 bg-police-dark/95 mix-blend-multiply"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-police-dark via-police-dark/90 to-transparent"></div>
+        <div className="absolute inset-0 bg-black/20"></div>
+
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-police-light/20 rounded-full blur-[100px] translate-y-1/2"></div>
 
         <div className="container mx-auto px-4 py-12 relative z-10">

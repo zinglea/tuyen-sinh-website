@@ -50,7 +50,7 @@ export default async function NewsDetail({ params }: { params: Promise<{ slug: s
     const formattedDate = `${dateObj.getDate().toString().padStart(2, '0')}/${(dateObj.getMonth() + 1).toString().padStart(2, '0')}/${dateObj.getFullYear()}`;
 
     return (
-        <div className="min-h-screen bg-slate-50">
+        <div className="min-h-screen bg-transparent">
             {/* Header */}
             <Header />
 
