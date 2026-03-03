@@ -1,0 +1,6 @@
+npm run dev
+git add .
+git commit -m "Cập nhật nội dung dự án"
+git push origin main
+git push origin master
+git push
