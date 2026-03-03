@@ -7,6 +7,9 @@ import PptxSlideNav from '@/components/PptxSlideNav'
 import Header from '@/components/Header'
 import FacebookComments from '@/components/FacebookComments'
 import PdfViewerClient from '@/components/PdfViewerClient'
+import ShareAndPrintBar from '@/components/ShareAndPrintBar'
+import ArticleViewTracker from '@/components/ArticleViewTracker'
+import PopularNews from '@/components/PopularNews'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,7 +33,8 @@ export default async function NewsDetail({ params }: { params: Promise<{ slug: s
                 contentType: 'supabase_news',
                 contentHtml: data.content || '',
                 rawFileUrl: '',
-                slug: slug
+                slug: slug,
+                tags: data.tags || ''
             }
         }
     } else {
@@ -90,14 +94,31 @@ export default async function NewsDetail({ params }: { params: Promise<{ slug: s
 
                         {/* Author at the bottom */}
                         {article.author && (
-                            <div className="mt-12 flex justify-end">
-                                <div className="inline-flex flex-col items-center bg-slate-50 border border-slate-100 px-8 py-5 rounded-2xl shadow-sm">
-                                    <PenTool className="w-6 h-6 text-slate-400 mb-2" />
-                                    <span className="text-xs uppercase tracking-widest text-slate-500 font-bold mb-1">Tác giả bài viết</span>
-                                    <span className="text-lg font-bold text-police-dark font-serif">{article.author}</span>
+                            <div className="mt-12 mb-8 flex justify-end">
+                                <div className="inline-flex flex-col items-center border-t border-slate-200 pt-6 px-4">
+                                    <PenTool className="w-5 h-5 text-slate-400 mb-2 rotate-180" />
+                                    <span className="text-[11px] uppercase tracking-[0.2em] text-slate-400 font-bold mb-1">Tác giả bài viết</span>
+                                    <span className="text-lg text-slate-700 font-serif italic">{article.author}</span>
                                 </div>
                             </div>
                         )}
+
+                        {/* Tags & Action Bar */}
+                        <div className="mt-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 py-4 border-y border-slate-100">
+                            <div className="flex-1">
+                                {article.tags && article.tags.trim() !== '' && (
+                                    <div className="flex items-center flex-wrap gap-2">
+                                        <span className="text-sm font-semibold text-slate-500 mr-1">Tag</span>
+                                        {article.tags.split(/,|#/).map((tag: string) => tag.trim()).filter(Boolean).map((t: string, idx: number) => (
+                                            <span key={idx} className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs font-medium hover:bg-slate-200 transition cursor-default">
+                                                {t}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            <ShareAndPrintBar url={`https://tuyensinhcaobang.vn/tin-tuc/${article.slug}`} title={article.title} />
+                        </div>
 
                         {/* Social share + CTA */}
                         <div className="mt-8 pt-6 md:pt-8 border-t border-slate-200">
@@ -136,11 +157,19 @@ export default async function NewsDetail({ params }: { params: Promise<{ slug: s
                             </div>
                         </div>
 
-                        {/* Facebook Comments */}
                         <FacebookComments href={`https://tuyensinhcaobang.vn/tin-tuc/${article.slug}`} />
                     </article>
                 </div>
             </div>
+
+            {/* Popular News Section */}
+            <div className="container mx-auto px-4 pb-12">
+                <div className="max-w-4xl mx-auto">
+                    <PopularNews />
+                </div>
+            </div>
+
+            {article.id && <ArticleViewTracker articleId={article.id} category={article.category || 'Tin tức'} />}
         </div>
     )
 }

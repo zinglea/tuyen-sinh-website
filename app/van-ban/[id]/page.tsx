@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { createClient } from '@/utils/supabase/client'
 import PdfViewerClient from '@/components/PdfViewerClient'
 import Header from '@/components/Header'
+import ArticleViewTracker from '@/components/ArticleViewTracker'
 import { ArrowLeft, Calendar, FileText, Download, Building2, Scale, Tag } from 'lucide-react'
 
 interface DocDetail {
@@ -268,9 +269,22 @@ export default function VanBanDetailPage() {
                                     <p className="text-xs text-slate-400 mt-0.5">{doc.file_type?.toUpperCase()} · Đăng ngày {formatDate(doc.created_at)}</p>
                                 </div>
                                 {isCloud && (
-                                    <a href={doc.file_url} download className="inline-flex items-center gap-2 px-5 py-2.5 bg-police-dark hover:bg-police-light text-white text-sm font-semibold rounded-xl transition shadow-sm">
+                                    <button onClick={() => {
+                                        fetch('/api/track-view', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ type: 'document_download', id: doc.id })
+                                        }).catch(console.error)
+
+                                        const link = document.createElement('a')
+                                        link.href = doc.file_url
+                                        link.download = doc.title || 'document'
+                                        document.body.appendChild(link)
+                                        link.click()
+                                        document.body.removeChild(link)
+                                    }} className="inline-flex items-center gap-2 px-5 py-2.5 bg-police-dark hover:bg-police-light text-white text-sm font-semibold rounded-xl transition shadow-sm">
                                         <Download className="w-4 h-4" /> Tải xuống
-                                    </a>
+                                    </button>
                                 )}
                                 {isLocal && localDoc && (
                                     <Link href={`/tin-tuc/${localDoc.slug}`} className="inline-flex items-center gap-2 px-5 py-2.5 bg-police-dark hover:bg-police-light text-white text-sm font-semibold rounded-xl transition shadow-sm">
@@ -282,6 +296,8 @@ export default function VanBanDetailPage() {
                     )}
                 </div>
             </div>
+
+            {isCloud && doc && <ArticleViewTracker articleId={doc.id} category="document" />}
         </div>
     )
 }

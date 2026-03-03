@@ -16,6 +16,7 @@ interface NewsItem {
     source: 'supabase' | 'local'
     slug?: string
     category?: string
+    tags?: string
 }
 
 const CATEGORIES = [
@@ -44,6 +45,7 @@ export default function AdminNewsPage() {
     const [author, setAuthor] = useState('Admin')
     const [category, setCategory] = useState('Tin Tức')
     const [articleDate, setArticleDate] = useState('')
+    const [tags, setTags] = useState('')
 
     // File upload
     const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -65,6 +67,7 @@ export default function AdminNewsPage() {
             ...item,
             source: 'supabase' as const,
             category: item.category || 'Tin tức',
+            tags: item.tags || '',
             image_url: maskSupabaseUrl(item.image_url),
             content: maskSupabaseUrl(item.content)
         }))
@@ -80,7 +83,7 @@ export default function AdminNewsPage() {
                         id: item.id, title: item.title, content: item.excerpt || '',
                         image_url: item.image || null, author: item.author || 'Admin',
                         created_at: item.date, source: 'local' as const, slug: item.slug,
-                        category: item.category,
+                        category: item.category, tags: item.tags || '',
                     }))
             }
         } catch (e) { /* ignore */ }
@@ -92,7 +95,7 @@ export default function AdminNewsPage() {
     useEffect(() => { fetchAll() }, [])
 
     const resetForm = () => {
-        setTitle(''); setContent(''); setAuthor('Admin'); setCategory('Tin Tức'); setArticleDate('')
+        setTitle(''); setContent(''); setAuthor('Admin'); setCategory('Tin Tức'); setArticleDate(''); setTags('');
         setSelectedFile(null); setParsedHtml(''); setThumbnailFile(null); setThumbnailPreview('')
         setEditingId(null)
         setMode('write') // Default to write for edit mostly
@@ -106,6 +109,7 @@ export default function AdminNewsPage() {
         setContent(item.content || '')
         setAuthor(item.author)
         setCategory(item.category || 'Tin Tức')
+        setTags(item.tags || '')
         setArticleDate(item.created_at ? item.created_at.split('T')[0] : '')
         setThumbnailPreview(item.image_url || '')
         setMode('write') // Edit defaults to rich text
@@ -198,6 +202,7 @@ export default function AdminNewsPage() {
             content: finalContent,
             author,
             category,
+            tags: tags.trim() || null,
             image_url: imageUrl || null,
         }
         if (articleDate) {
@@ -379,10 +384,16 @@ export default function AdminNewsPage() {
                                 <input type="text" value={title} onChange={e => setTitle(e.target.value)} required placeholder="VD: Thông báo tuyển sinh năm 2026" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition text-sm" />
                             </div>
 
-                            {/* Author */}
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Tác giả</label>
-                                <input type="text" value={author} onChange={e => setAuthor(e.target.value)} placeholder="Admin" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition text-sm" />
+                            {/* Author & Tags */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Tác giả</label>
+                                    <input type="text" value={author} onChange={e => setAuthor(e.target.value)} placeholder="Admin" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition text-sm" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Thẻ Tag</label>
+                                    <input type="text" value={tags} onChange={e => setTags(e.target.value)} placeholder="VD: tuyển sinh, thông báo, ..." className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition text-sm" />
+                                </div>
                             </div>
 
                             {/* Thumbnail */}

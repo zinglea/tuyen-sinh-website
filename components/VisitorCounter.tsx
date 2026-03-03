@@ -1,19 +1,22 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Eye, Users, TrendingUp } from 'lucide-react'
 
 interface Stats {
     totalVisitors: number
     onlineNow: number
     todayViews: number
+    weekViews: number
+    monthViews: number
 }
 
 export default function VisitorCounter() {
     const [stats, setStats] = useState<Stats>({
         totalVisitors: 0,
         onlineNow: 0,
-        todayViews: 0
+        todayViews: 0,
+        weekViews: 0,
+        monthViews: 0
     })
     const [mounted, setMounted] = useState(false)
 
@@ -46,6 +49,8 @@ export default function VisitorCounter() {
                     setStats({
                         totalVisitors: data.totalVisitors || 0,
                         todayViews: data.todayViews || 0,
+                        weekViews: data.weekViews || 0,
+                        monthViews: data.monthViews || 0,
                         onlineNow: data.onlineNow || 1
                     })
                 }
@@ -65,39 +70,42 @@ export default function VisitorCounter() {
     if (!mounted) return null
 
     return (
-        <div className="bg-white/80 backdrop-blur-xl border border-white shadow-[0_4px_20px_rgb(0,0,0,0.03)] rounded-3xl overflow-hidden">
-            <div className="px-6 py-5 border-b border-slate-100">
-                <h3 className="text-lg font-extrabold text-slate-800 uppercase tracking-wide flex items-center gap-3">
-                    <div className="w-1.5 h-6 bg-green-500 rounded-full"></div>
+        <div className="bg-white/80 backdrop-blur-xl border border-white shadow-[0_4px_20px_rgb(0,0,0,0.03)] rounded-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+                <h3 className="text-[15px] font-extrabold text-slate-800 uppercase tracking-wide flex items-center gap-3">
+                    <div className="w-1.5 h-5 bg-green-500 rounded-full"></div>
                     Thống kê truy cập
                 </h3>
             </div>
-            <div className="p-5 grid grid-cols-3 gap-3">
-                <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 rounded-2xl p-4 text-center group hover:shadow-md transition-all">
-                    <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition-transform">
-                        <Users className="w-5 h-5 text-blue-600" />
-                    </div>
-                    <p className="text-2xl font-extrabold text-blue-700">{stats.totalVisitors.toLocaleString('vi-VN')}</p>
-                    <p className="text-xs text-blue-500 font-semibold mt-1">Tổng lượt</p>
-                </div>
-                <div className="bg-gradient-to-br from-green-50 to-green-100/50 rounded-2xl p-4 text-center group hover:shadow-md transition-all">
-                    <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition-transform">
-                        <div className="relative">
-                            <Eye className="w-5 h-5 text-green-600" />
-                            <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full animate-ping"></span>
-                            <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full"></span>
-                        </div>
-                    </div>
-                    <p className="text-2xl font-extrabold text-green-700">{stats.onlineNow}</p>
-                    <p className="text-xs text-green-500 font-semibold mt-1">Đang online</p>
-                </div>
-                <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 rounded-2xl p-4 text-center group hover:shadow-md transition-all">
-                    <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition-transform">
-                        <TrendingUp className="w-5 h-5 text-amber-600" />
-                    </div>
-                    <p className="text-2xl font-extrabold text-amber-700">{stats.todayViews}</p>
-                    <p className="text-xs text-amber-500 font-semibold mt-1">Hôm nay</p>
-                </div>
+            <div className="p-0">
+                <ul className="divide-y divide-slate-100">
+                    <li className="flex items-center justify-between px-6 py-3.5 hover:bg-slate-50 transition">
+                        <span className="text-sm font-semibold text-slate-600 flex items-center gap-2">
+                            <span className="relative flex h-2.5 w-2.5 mr-1">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                            </span>
+                            Đang truy cập
+                        </span>
+                        <span className="text-base font-extrabold text-green-600">{stats.onlineNow.toLocaleString('vi-VN')}</span>
+                    </li>
+                    <li className="flex items-center justify-between px-6 py-3.5 hover:bg-slate-50 transition">
+                        <span className="text-sm font-semibold text-slate-600">Hôm nay</span>
+                        <span className="text-base font-bold text-slate-800">{stats.todayViews.toLocaleString('vi-VN')}</span>
+                    </li>
+                    <li className="flex items-center justify-between px-6 py-3.5 hover:bg-slate-50 transition">
+                        <span className="text-sm font-semibold text-slate-600">Trong tuần</span>
+                        <span className="text-base font-bold text-slate-800">{stats.weekViews.toLocaleString('vi-VN')}</span>
+                    </li>
+                    <li className="flex items-center justify-between px-6 py-3.5 hover:bg-slate-50 transition">
+                        <span className="text-sm font-semibold text-slate-600">Tháng hiện tại</span>
+                        <span className="text-base font-bold text-slate-800">{stats.monthViews.toLocaleString('vi-VN')}</span>
+                    </li>
+                    <li className="flex items-center justify-between px-6 py-4 bg-slate-50/50">
+                        <span className="text-sm font-bold text-slate-700 uppercase tracking-widest text-[11px]">Tổng truy cập</span>
+                        <span className="text-xl font-black text-blue-600">{stats.totalVisitors.toLocaleString('vi-VN')}</span>
+                    </li>
+                </ul>
             </div>
         </div>
     )
