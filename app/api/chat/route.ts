@@ -1,6 +1,8 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { streamText } from 'ai'
+import { createGoogleGenerativeAI } from '@ai-sdk/google'
 
 // Vercel serverless function timeout (seconds)
 export const maxDuration = 30;
@@ -33,6 +35,7 @@ QUY TẮC THỜI GIAN VÀ CHỐNG SUY DIỄN (ANTI-HALLUCINATION):
    "Theo hướng dẫn mới nhất, thí sinh cần tham chiếu Thông tư/văn bản liên quan. Tuy nhiên, nội dung chi tiết của văn bản phần này chưa được Quản trị viên cập nhật vào Hệ thống kho dữ liệu Trợ lý ảo. Bạn vui lòng liên hệ Đường dây nóng của Hội đồng tuyển sinh - Phòng TCCB Công an Tỉnh để được tư vấn chính xác!"
 5. GIỚI HẠN VĂN BẢN DỰ THẢO: Nếu TẤT CẢ [Tài Liệu] trích xuất đều mang nhãn cảnh báo "⚠️ VĂN BẢN DỰ THẢO" hoặc thông tin chủ yếu lấy từ tài liệu này, bạn BẮT BUỘC phải xuống dòng và kết thúc phần Trả lời bằng dòng thông báo NGHIÊM NGẶT sau (in đậm):
    **"⚠️ Lưu ý: Nội dung trên được tham chiếu từ văn bản hiện đang là Dự thảo, chưa có văn bản công bố chính thức. Thí sinh vui lòng theo dõi thêm để cập nhật Quyết định/Hướng dẫn chính thức từ Bộ Công an hoặc liên hệ trực tiếp HĐTS."**
+6. CHI TIẾT ĐỐI TƯỢNG ƯU TIÊN: Khi trình bày các tiêu chuẩn (đặc biệt là chiều cao, sức khỏe), BẮT BUỘC KHÔNG ĐƯỢC BỎ SÓT hoặc GỘP CHUNG các đối tượng ưu tiên khác nhau. Ví dụ: "Dân tộc thiểu số" và "Dân tộc thiểu số RẤT ÍT NGƯỜI" là hai đối tượng có ngưỡng tiêu chuẩn khác nhau, phải liệt kê tách bạch cả hai. LUÔN LUÔN đọc kỹ từng con số trong [Tài Liệu] để trả lời chính xác nhất.
 `;
 
 export async function POST(req: NextRequest) {
@@ -137,40 +140,27 @@ export async function POST(req: NextRequest) {
 
     console.log(`[Chat] Prompt size: ${Math.round(prompt.length / 1024)} KB, starting Gemini call at + ${Date.now() - startTime} ms`);
 
-    // Call Gemini
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    // Call Gemini using AI SDK
+    const google = createGoogleGenerativeAI({
+      apiKey: apiKey,
+    });
 
-    const result = await model.generateContentStream(prompt);
+    console.log(`[Chat] Calling Gemini with AI SDK at + ${Date.now() - startTime} ms`);
 
-    const stream = new ReadableStream({
-      async start(controller) {
-        let fullResponse = '';
-        try {
-          for await (const chunk of result.stream) {
-            const chunkText = chunk.text();
-            fullResponse += chunkText;
-            controller.enqueue(new TextEncoder().encode(chunkText));
-          }
-
-          // Save history after stream finishes
-          history.push({ role: 'model', content: fullResponse });
-          if (history.length > MAX_HISTORY) history.shift();
-          conversationStore.set(sessionId, history);
-
-          controller.close();
-        } catch (streamError) {
-          console.error('[Chat Stream] Error:', streamError);
-          controller.error(streamError);
-        }
+    const result = await streamText({
+      model: google('gemini-2.5-flash'),
+      prompt: prompt,
+      onFinish({ text }) {
+        // Save history after stream finishes
+        history.push({ role: 'model', content: text });
+        if (history.length > MAX_HISTORY) history.shift();
+        conversationStore.set(sessionId, history);
       }
     });
 
-    return new NextResponse(stream, {
+    return result.toTextStreamResponse({
       headers: {
-        'Content-Type': 'text/plain; charset=utf-8',
         'x-session-id': sessionId,
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
       }
     });
 
