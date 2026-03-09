@@ -16,7 +16,7 @@ import { GoogleAnalytics } from '@next/third-parties/google'
 // 🔴 LỆNH TẮT/BẬT BẢO TRÌ WEBSITE
 // ==========================================
 // THAO TÁC: Đổi giá trị `false` thành `true` để bật giao diện "Đang bảo trì" trên toàn bộ Web.
-const MAINTENANCE_MODE = true;
+const MAINTENANCE_MODE = false;
 
 export default function RootLayout({
   children,
