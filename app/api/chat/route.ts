@@ -4,8 +4,8 @@ import { createClient } from '@supabase/supabase-js'
 import { streamText } from 'ai'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 
-// Vercel serverless function timeout (seconds)
-export const maxDuration = 30;
+// Vercel serverless function timeout (max 5 minutes)
+export const maxDuration = 300;
 
 // Rate Limiter
 const rateLimitMap = new Map<string, { count: number, resetTime: number }>();

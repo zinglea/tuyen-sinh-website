@@ -90,25 +90,23 @@ export default function Chatbot() {
       setIsLoading(false)
       setIsStreaming(true)
 
+      // Tạo ngay bóng chat rỗng của AI để hiển thị hiệu ứng "đang gõ" (...)
+      setMessages(prev => [...prev, { role: 'assistant', content: '' }])
+
       const decoder = new TextDecoder()
       let aiMessage = ''
-      let isFirstChunk = true
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
 
         aiMessage += decoder.decode(value, { stream: true })
-        if (isFirstChunk) {
-          isFirstChunk = false
-          setMessages(prev => [...prev, { role: 'assistant', content: aiMessage }])
-        } else {
-          setMessages(prev => {
-            const newArray = [...prev]
-            newArray[newArray.length - 1] = { role: 'assistant', content: aiMessage }
-            return newArray
-          })
-        }
+
+        setMessages(prev => {
+          const newArray = [...prev]
+          newArray[newArray.length - 1] = { role: 'assistant', content: aiMessage }
+          return newArray
+        })
       }
     } catch (error: any) {
       console.error('Error:', error)
