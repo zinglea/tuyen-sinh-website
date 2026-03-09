@@ -85,7 +85,7 @@ export default function Chatbot() {
       console.error('Error:', error)
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: 'Xin lỗi, đã có lỗi xảy ra. Vui lòng kiểm tra lại API key hoặc thử lại sau.'
+        content: 'Lỗi không xác định'
       }])
     } finally {
       setIsLoading(false)
@@ -109,7 +109,7 @@ export default function Chatbot() {
   const suggestedQuestions = [
     'Điều kiện tuyển sinh là gì?',
     'Các ngành đào tạo có gì?',
-    'Học phí như thế nào?',
+    'Lệ phí tuyển sinh gồm những gì?',
     'Thời gian đăng ký khi nào?',
   ]
 
