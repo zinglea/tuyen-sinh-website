@@ -25,6 +25,7 @@ export default function Chatbot() {
   ])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [isStreaming, setIsStreaming] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Initialize session ID from localStorage or create new one
@@ -49,7 +50,7 @@ export default function Chatbot() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!input.trim() || isLoading || !sessionId) return
+    if (!input.trim() || isLoading || isStreaming || !sessionId) return
 
     const userMessage = input.trim()
     setInput('')
@@ -69,26 +70,55 @@ export default function Chatbot() {
       })
 
       if (!response.ok) {
+        const contentType = response.headers.get('content-type')
+        if (contentType && contentType.includes('application/json')) {
+          const data = await response.json()
+          throw new Error(data.response || 'Lỗi khi gọi API')
+        }
         throw new Error('Lỗi khi gọi API')
       }
 
-      const data = await response.json()
-
-      // Update session ID if server returns a new one
-      if (data.sessionId && data.sessionId !== sessionId) {
-        setSessionId(data.sessionId)
-        localStorage.setItem('chatbot_session_id', data.sessionId)
+      const newSessionId = response.headers.get('x-session-id')
+      if (newSessionId && newSessionId !== sessionId) {
+        setSessionId(newSessionId)
+        localStorage.setItem('chatbot_session_id', newSessionId)
       }
 
-      setMessages(prev => [...prev, { role: 'assistant', content: data.response }])
-    } catch (error) {
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('Không thể đọc dữ liệu trả về')
+
+      setIsLoading(false)
+      setIsStreaming(true)
+
+      const decoder = new TextDecoder()
+      let aiMessage = ''
+      let isFirstChunk = true
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        aiMessage += decoder.decode(value, { stream: true })
+        if (isFirstChunk) {
+          isFirstChunk = false
+          setMessages(prev => [...prev, { role: 'assistant', content: aiMessage }])
+        } else {
+          setMessages(prev => {
+            const newArray = [...prev]
+            newArray[newArray.length - 1] = { role: 'assistant', content: aiMessage }
+            return newArray
+          })
+        }
+      }
+    } catch (error: any) {
       console.error('Error:', error)
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: 'Lỗi không xác định'
+        content: error.message || 'Lỗi không xác định'
       }])
     } finally {
       setIsLoading(false)
+      setIsStreaming(false)
     }
   }
 
@@ -228,11 +258,11 @@ export default function Chatbot() {
               onChange={(e) => setInput(e.target.value)}
               placeholder="Nhập câu hỏi về tuyển sinh..."
               className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-police-light/50 focus:border-police-light text-sm"
-              disabled={isLoading}
+              disabled={isLoading || isStreaming}
             />
             <button
               type="submit"
-              disabled={isLoading || !input.trim()}
+              disabled={isLoading || isStreaming || !input.trim()}
               className="bg-gradient-to-r from-police-light to-police-dark text-white px-5 py-3 rounded-xl hover:shadow-lg hover:shadow-police-light/30 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium"
             >
               {isLoading ? (

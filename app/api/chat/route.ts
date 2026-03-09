@@ -140,20 +140,38 @@ export async function POST(req: NextRequest) {
     // Call Gemini
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
+    const result = await model.generateContentStream(prompt);
 
-    console.log(`[Chat] Gemini responded at + ${Date.now() - startTime} ms`);
+    const stream = new ReadableStream({
+      async start(controller) {
+        let fullResponse = '';
+        try {
+          for await (const chunk of result.stream) {
+            const chunkText = chunk.text();
+            fullResponse += chunkText;
+            controller.enqueue(new TextEncoder().encode(chunkText));
+          }
 
-    // Save AI response to history
-    history.push({ role: 'model', content: text });
-    if (history.length > MAX_HISTORY) history.shift();
-    conversationStore.set(sessionId, history);
+          // Save history after stream finishes
+          history.push({ role: 'model', content: fullResponse });
+          if (history.length > MAX_HISTORY) history.shift();
+          conversationStore.set(sessionId, history);
 
-    return NextResponse.json({
-      response: text,
-      sessionId: sessionId,
+          controller.close();
+        } catch (streamError) {
+          console.error('[Chat Stream] Error:', streamError);
+          controller.error(streamError);
+        }
+      }
+    });
+
+    return new NextResponse(stream, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'x-session-id': sessionId,
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      }
     });
 
   } catch (error: any) {
@@ -168,6 +186,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       response: errorMsg,
       sessionId: null,
-    });
+    }, { status: 500 });
   }
 }
