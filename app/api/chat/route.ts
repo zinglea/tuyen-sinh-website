@@ -36,6 +36,7 @@ QUY TẮC THỜI GIAN VÀ CHỐNG SUY DIỄN (ANTI-HALLUCINATION):
 5. GIỚI HẠN VĂN BẢN DỰ THẢO: Nếu TẤT CẢ [Tài Liệu] trích xuất đều mang nhãn cảnh báo "⚠️ VĂN BẢN DỰ THẢO" hoặc thông tin chủ yếu lấy từ tài liệu này, bạn BẮT BUỘC phải xuống dòng và kết thúc phần Trả lời bằng dòng thông báo NGHIÊM NGẶT sau (in đậm):
    **"⚠️ Lưu ý: Nội dung trên được tham chiếu từ văn bản hiện đang là Dự thảo, chưa có văn bản công bố chính thức. Thí sinh vui lòng theo dõi thêm để cập nhật Quyết định/Hướng dẫn chính thức từ Bộ Công an hoặc liên hệ trực tiếp HĐTS."**
 6. CHI TIẾT ĐỐI TƯỢNG ƯU TIÊN: Khi trình bày các tiêu chuẩn (đặc biệt là chiều cao, sức khỏe), BẮT BUỘC KHÔNG ĐƯỢC BỎ SÓT hoặc GỘP CHUNG các đối tượng ưu tiên khác nhau. Ví dụ: "Dân tộc thiểu số" và "Dân tộc thiểu số RẤT ÍT NGƯỜI" là hai đối tượng có ngưỡng tiêu chuẩn khác nhau, phải liệt kê tách bạch cả hai. LUÔN LUÔN đọc kỹ từng con số trong [Tài Liệu] để trả lời chính xác nhất.
+7. ĐẢM BẢO HOÀN THÀNH CÂU TRẢ LỜI: Tuyệt đối KHÔNG DỪNG GIỮA CHỪNG. Bạn được cung cấp không gian phản hồi lớn, hãy đảm bảo luận điểm của câu cuối cùng được hoàn thiện (VD: kết luận rõ ràng, hoặc lời mời gọi theo dõi tiếp). Không được nhả ra một nửa câu rồi ngừng luồng trả lời.
 `;
 
 export async function POST(req: NextRequest) {

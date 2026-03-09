@@ -201,8 +201,15 @@ export default function Chatbot() {
                   }`}
               >
                 {message.role === 'assistant' ? (
-                  <div className="text-sm leading-relaxed">
+                  <div className="text-sm leading-relaxed relative">
                     <FormattedMessage content={message.content} />
+                    {isStreaming && index === messages.length - 1 && (
+                      <span className="inline-flex items-center ml-2 space-x-1 animate-pulse">
+                        <span className="w-1.5 h-1.5 bg-police-light rounded-full"></span>
+                        <span className="w-1.5 h-1.5 bg-police-light rounded-full"></span>
+                        <span className="w-1.5 h-1.5 bg-police-light rounded-full"></span>
+                      </span>
+                    )}
                   </div>
                 ) : (
                   <p className="text-sm whitespace-pre-wrap">{message.content}</p>
