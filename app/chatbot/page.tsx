@@ -62,9 +62,9 @@ export default function Chatbot() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           message: userMessage,
-          sessionId: sessionId 
+          sessionId: sessionId
         }),
       })
 
@@ -73,13 +73,13 @@ export default function Chatbot() {
       }
 
       const data = await response.json()
-      
+
       // Update session ID if server returns a new one
       if (data.sessionId && data.sessionId !== sessionId) {
         setSessionId(data.sessionId)
         localStorage.setItem('chatbot_session_id', data.sessionId)
       }
-      
+
       setMessages(prev => [...prev, { role: 'assistant', content: data.response }])
     } catch (error) {
       console.error('Error:', error)
@@ -98,7 +98,7 @@ export default function Chatbot() {
     const newSessionId = generateSessionId()
     setSessionId(newSessionId)
     localStorage.setItem('chatbot_session_id', newSessionId)
-    
+
     // Reset messages
     setMessages([{
       role: 'assistant',
@@ -246,7 +246,7 @@ export default function Chatbot() {
 
         {/* Info Note */}
         <p className="text-xs text-slate-400 text-center mt-3">
-          💡 Trợ lý AI nhớ ngữ cảnh cuộc trò chuyện để trả lời chính xác hơn
+          💡 Các thông tin AI cung cấp chỉ mang tính chất tham khảo, thí sinh cần đối chiếu với thông tin chính thức từ Bộ Công an
         </p>
       </div>
     </div>

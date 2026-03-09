@@ -131,6 +131,7 @@ async function main() {
                         docId: fileData.id || file,
                         chunkIndex: i,
                         totalChunks: chunks.length,
+                        isDraft: fileData.metadata?.isDraft || false,
                     };
 
                     // 4. Insert lên Supabase (Gắn thêm trường year)

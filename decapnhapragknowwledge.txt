@@ -1,0 +1,28 @@
+Mỗi khi bạn thêm hoặc cập nhật file tài liệu mới (Word, PDF, TXT) vào thư mục data/rag/documents/ (được phân loại theo các thư mục năm như 2024, 2025...), bạn cần chạy 3 lệnh sau theo thứ tự từ thư mục gốc của dự án (e:\files\tuyen-sinh-website\tuyen-sinh-website) để xử lý và đẩy dữ liệu lên hệ thống AI:
+
+1. Parse tài liệu thành định dạng JSON có thể đọc được:
+
+bash
+npx tsx scripts/process-knowledge-base.ts
+(Lệnh này sẽ quét toàn bộ file mới trong thư mục documents và tạo ra các file phân tích .json tương ứng trong thư mục data/rag/processed/)
+
+2. Tổng hợp dữ liệu thành file text kiến thức chung (knowledge.txt):
+
+bash
+node scripts/extract-knowledge.js
+(Lệnh này sẽ đọc tất cả các file JSON vừa tạo và gộp thành một file data/rag/knowledge.txt)
+
+3. Tạo Vector và đẩy dữ liệu lên cơ sở dữ liệu Supabase:
+
+bash
+npx tsx scripts/embed-knowledge.ts
+(Lệnh này là lệnh quan trọng nhất để AI có thể "hiểu" tài liệu của bạn. Nó sẽ cắt nhỏ các đoạn văn bản, sử dụng AI (Gemini) để chuyển các đoạn này thành vector nhúng dạng số và upload toàn bộ lên Database Supabase).
+
+TIP
+
+Tóm tắt (chạy gộp 3 lệnh):
+Bạn có thể copy dán lệnh kết hợp này để chạy một mạch cả 3 bước tiết kiệm thời gian:
+
+bash
+npx tsx scripts/process-knowledge-base.ts && node scripts/extract-knowledge.js && npx tsx scripts/embed-knowledge.ts
+Sau khi chạy xong lệnh số 3 báo ĐÃ HOÀN THÀNH, dữ liệu mới đã hoàn toàn có sẵn trên mạng và AI lập tức được cập nhật thông tin để trả lời thí sinh.

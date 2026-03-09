@@ -83,6 +83,7 @@ async function processDocument(filePath: string): Promise<void> {
       filePath: path.relative(process.cwd(), filePath),
       size: stat.size,
       modified: stat.mtime.toISOString(),
+      isDraft: filename.includes('DỰ THẢO') || filename.includes('DU THAO') || content.substring(0, 500).includes('DỰ THẢO') || content.substring(0, 500).includes('DU THAO'),
     },
   };
 

@@ -31,6 +31,8 @@ QUY TẮC THỜI GIAN VÀ CHỐNG SUY DIỄN (ANTI-HALLUCINATION):
 3. DẪN CHIẾU VĂN BẢN: Nếu tài liệu năm ${currentYear} có nhắc đến "thực hiện theo" một văn bản cũ (ví dụ: Thông tư 62 năm 2023), tự động đối chiếu nội dung của văn bản cũ đó trong đống [Tài Liệu] được cấp để trả lời.
 4. KILL-SWITCH (DẬP TẮT SUY DIỄN): Tuyệt đối KHÔNG BỊA ĐẶT nội dung luật nằm ngoài [Tài Liệu] bên dưới. Nếu [Tài Liệu] bắt phải tuân theo Thông tư 62, nhưng CHÍNH QUÁ TRÌNH LỤC TÌM BÊN DƯỚI lại KHÔNG HỀ CÓ nội dung chi tiết của Thông tư 62, PHẢI THÚ NHẬN: 
    "Theo hướng dẫn mới nhất, thí sinh cần tham chiếu Thông tư/văn bản liên quan. Tuy nhiên, nội dung chi tiết của văn bản phần này chưa được Quản trị viên cập nhật vào Hệ thống kho dữ liệu Trợ lý ảo. Bạn vui lòng liên hệ Đường dây nóng của Hội đồng tuyển sinh - Phòng TCCB Công an Tỉnh để được tư vấn chính xác!"
+5. GIỚI HẠN VĂN BẢN DỰ THẢO: Nếu TẤT CẢ [Tài Liệu] trích xuất đều mang nhãn cảnh báo "⚠️ VĂN BẢN DỰ THẢO" hoặc thông tin chủ yếu lấy từ tài liệu này, bạn BẮT BUỘC phải xuống dòng và kết thúc phần Trả lời bằng dòng thông báo NGHIÊM NGẶT sau (in đậm):
+   **"⚠️ Lưu ý: Nội dung trên được tham chiếu từ văn bản hiện đang là Dự thảo, chưa có văn bản công bố chính thức. Thí sinh vui lòng theo dõi thêm để cập nhật Quyết định/Hướng dẫn chính thức từ Bộ Công an hoặc liên hệ trực tiếp HĐTS."**
 `;
 
 export async function POST(req: NextRequest) {
@@ -123,9 +125,10 @@ export async function POST(req: NextRequest) {
     let knowledgeContext = '';
     if (matchedDocs && matchedDocs.length > 0) {
       // ✅ Bơm Metadata Năm ban hành thẳng vào chữ
-      const docsContent = matchedDocs.map((doc: any, index: number) =>
-        `[Tài Liệu ${index + 1} - Năm: ${doc.year || 'Chưa rõ'} - Nguồn: ${doc.metadata?.source || 'Khuyết danh'}]: \n${doc.content} `
-      ).join('\n\n--- Dấu phân Cách ---\n\n');
+      const docsContent = matchedDocs.map((doc: any, index: number) => {
+        const draftStatus = doc.metadata?.isDraft ? ' - ⚠️ VĂN BẢN DỰ THẢO' : '';
+        return `[Tài Liệu ${index + 1} - Năm: ${doc.year || 'Chưa rõ'} - Nguồn: ${doc.metadata?.source || 'Khuyết danh'}${draftStatus}]: \n${doc.content} `;
+      }).join('\n\n--- Dấu phân Cách ---\n\n');
       knowledgeContext = `\n\n⬇️ DƯỚI ĐÂY LÀ KHO DỮ LIỆU ĐƯỢC CHẮT LỌC.CẤM BỊA ĐẶT NÀO NẰM NGOÀI: \n\n${docsContent} \n`;
     }
 
