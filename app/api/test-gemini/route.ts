@@ -17,7 +17,7 @@ export async function GET() {
 
     try {
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
         const t1 = Date.now();
         const result = await model.generateContent('Nói "xin chào" bằng tiếng Việt, chỉ 1 câu ngắn.');

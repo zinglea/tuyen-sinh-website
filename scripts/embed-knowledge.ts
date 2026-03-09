@@ -29,7 +29,7 @@ const PROCESSED_DIR = path.join(process.cwd(), 'data', 'rag', 'processed');
 
 // Hàm chunking: cắt text thành các đoạn nhỏ hơn (ví dụ 1000 ký tự)
 // Lưu ý: Đây là cách cắt đơn giản. Tốt nhất là cắt theo câu hoặc đoạn văn (\n\n).
-function chunkText(text: string, maxChunkSize = 1000): string[] {
+function chunkText(text: string, maxChunkSize = 5000): string[] {
     const chunks: string[] = [];
     const paragraphs = text.split('\n\n');
 
@@ -74,6 +74,18 @@ async function getEmbedding(text: string): Promise<number[]> {
 async function main() {
     console.log("🚀 Bắt đầu quá trình tạo Embedding và upload lên Supabase...");
 
+    console.log('Xóa toàn bộ dữ liệu vector cũ trong bảng documents_embeddings để tránh trùng lặp...');
+    const { error: deleteError } = await supabase
+        .from('documents_embeddings')
+        .delete()
+        .not('id', 'is', null); // Delete all rows
+
+    if (deleteError) {
+        console.error('❌ Lỗi khi xóa dữ liệu cũ:', deleteError);
+        return;
+    }
+    console.log('✅ Đã dọn sạch dữ liệu cũ.\n');
+
     if (!fs.existsSync(PROCESSED_DIR)) {
         console.error(`❌ Không tìm thấy thư mục dữ liệu: ${PROCESSED_DIR}`);
         return;
@@ -99,8 +111,8 @@ async function main() {
 
             console.log(`\n⏳ Đang xử lý file: ${filename} (${Math.round(textContent.length / 1024)}KB)`);
 
-            // 1. Chia nhỏ văn bản
-            const chunks = chunkText(textContent, 1000);
+            // 1. Chia nhỏ văn bản với block lớn (bao trọn từng Mục/Phần)
+            const chunks = chunkText(textContent, 4800);
             console.log(`   ✂️ Đã cắt thành ${chunks.length} đoạn nhỏ.`);
 
             for (let i = 0; i < chunks.length; i++) {
@@ -121,13 +133,16 @@ async function main() {
                         totalChunks: chunks.length,
                     };
 
-                    // 4. Insert lên Supabase
+                    // 4. Insert lên Supabase (Gắn thêm trường year)
+                    const yearData = fileData.metadata?.year ? fileData.metadata.year : null;
+
                     const { error } = await supabase
                         .from('documents_embeddings')
                         .insert({
                             content: chunk,
                             metadata: metadata,
-                            embedding: embeddingVector
+                            embedding: embeddingVector,
+                            year: yearData
                         });
 
                     if (error) {

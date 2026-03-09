@@ -15,7 +15,7 @@ interface ScoreResult {
 
 export default function ScoreCalculator() {
   const currentYear = new Date().getFullYear()
-  
+
   const [isOpen, setIsOpen] = useState(false)
   const [namGrad, setNamGrad] = useState(currentYear.toString())
   const [m1, setM1] = useState('')
@@ -27,6 +27,21 @@ export default function ScoreCalculator() {
   const [dt, setDt] = useState('0')
   const [dth, setDth] = useState('0')
   const [result, setResult] = useState<ScoreResult | null>(null)
+
+  const handleScoreChange = (setter: React.Dispatch<React.SetStateAction<string>>, maxVal: number) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    if (val === '') {
+      setter(val);
+      return;
+    }
+    const num = parseFloat(val);
+    if (!isNaN(num) && num >= 0 && num <= maxVal) {
+      setter(val);
+    } else if (num > maxVal) {
+      // Báo lỗi bằng cách chặn và gán bằng max
+      setter(maxVal.toString());
+    }
+  }
 
   // Auto-set graduation year on mount
   useEffect(() => {
@@ -47,7 +62,7 @@ export default function ScoreCalculator() {
     let kvVal = parseFloat(kv)
     let kvApplied = true
     let kvWarning = ''
-    
+
     if (yearsDiff > 1) {
       kvVal = 0
       kvApplied = false
@@ -69,7 +84,7 @@ export default function ScoreCalculator() {
     // 4. Tinh diem cong (co xet giam tru neu tong diem >= 22.5)
     const diemCongGoc = kvVal + dtVal + dthVal
     let diemCongThucTe = diemCongGoc
-    
+
     if (tongDiemThi >= 22.5) {
       diemCongThucTe = ((30 - tongDiemThi) / 7.5) * diemCongGoc
     }
@@ -161,7 +176,7 @@ export default function ScoreCalculator() {
                     max="10"
                     step="0.25"
                     value={m1}
-                    onChange={(e) => setM1(e.target.value)}
+                    onChange={handleScoreChange(setM1, 10)}
                     placeholder="0.00"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-police-light/50 focus:border-police-light"
                   />
@@ -174,7 +189,7 @@ export default function ScoreCalculator() {
                     max="10"
                     step="0.25"
                     value={m2}
-                    onChange={(e) => setM2(e.target.value)}
+                    onChange={handleScoreChange(setM2, 10)}
                     placeholder="0.00"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-police-light/50 focus:border-police-light"
                   />
@@ -187,7 +202,7 @@ export default function ScoreCalculator() {
                     max="10"
                     step="0.25"
                     value={m3}
-                    onChange={(e) => setM3(e.target.value)}
+                    onChange={handleScoreChange(setM3, 10)}
                     placeholder="0.00"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-police-light/50 focus:border-police-light"
                   />
@@ -207,13 +222,19 @@ export default function ScoreCalculator() {
                   max="100"
                   step="0.01"
                   value={btbca}
-                  onChange={(e) => setBtbca(e.target.value)}
+                  onChange={handleScoreChange(setBtbca, parseFloat(thangDiem))}
                   placeholder="Nhập điểm..."
                   className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-police-light/50 focus:border-police-light"
                 />
                 <select
                   value={thangDiem}
-                  onChange={(e) => setThangDiem(e.target.value)}
+                  onChange={(e) => {
+                    const newMax = e.target.value;
+                    setThangDiem(newMax);
+                    if (parseFloat(btbca) > parseFloat(newMax)) {
+                      setBtbca(newMax);
+                    }
+                  }}
                   className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-police-light/50 focus:border-police-light w-32"
                 >
                   <option value="30">Thang 30</option>
@@ -288,7 +309,7 @@ export default function ScoreCalculator() {
                   <div className="w-2 h-2 rounded-full bg-green-500"></div>
                   Kết quả tính toán
                 </h4>
-                
+
                 {/* KV Warning */}
                 {!result.kvApplied && (
                   <div className="flex items-start gap-2 mb-4 p-3 bg-red-50 border border-red-200 rounded-xl">
@@ -316,25 +337,25 @@ export default function ScoreCalculator() {
                     <span className="text-sm text-slate-600">Tổng điểm thi (chưa cộng):</span>
                     <span className="text-lg font-bold text-slate-800">{result.tongDiemThi.toFixed(2)}</span>
                   </div>
-                  
+
                   {result.diemCongGoc !== result.diemCongThucTe && (
                     <div className="flex justify-between items-center py-2 border-b border-slate-200/60">
                       <span className="text-sm text-slate-600">Điểm cộng gốc:</span>
                       <span className="text-slate-500 line-through">{result.diemCongGoc.toFixed(2)}</span>
                     </div>
                   )}
-                  
+
                   <div className="flex justify-between items-center py-2 border-b border-slate-200/60">
                     <span className="text-sm text-slate-600">Điểm cộng thực nhận:</span>
                     <span className="text-lg font-bold text-slate-800">{result.diemCongThucTe.toFixed(2)}</span>
                   </div>
-                  
+
                   <div className="flex justify-between items-center py-4 bg-white rounded-xl px-4 shadow-md border border-police-light/20">
                     <span className="text-base font-bold text-slate-700">Điểm xét tuyển:</span>
                     <span className="text-3xl font-extrabold text-police-dark">{result.diemXetTuyen.toFixed(2)}</span>
                   </div>
                 </div>
-                
+
                 {result.tongDiemThi >= 22.5 && (
                   <p className="text-xs text-amber-600 mt-4 italic bg-amber-50 p-2 rounded-lg">
                     * Áp dụng luật giảm trừ điểm cộng vì tổng điểm thi &gt;= 22.5

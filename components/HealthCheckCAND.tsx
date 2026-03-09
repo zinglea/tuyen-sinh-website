@@ -2,29 +2,46 @@
 import React, { useState, useEffect } from 'react';
 
 const HealthCheckCAND = () => {
-    // Trạng thái mặc định (Giả định là người bình thường và đạt chuẩn)
     const [formData, setFormData] = useState({
+        // 1. THỂ LỰC & ƯU TIÊN
         gender: 'Nam',
         priority: 'Bình thường',
-        height: 165, // cm
-        weight: 60, // kg
-        visionDefect: false, // Có mắc tật khúc xạ không?
-        diopters: 0, // Số đi-ốp nếu có
-        tattoos: false, // Xăm hình (không tính xăm mày/môi thẩm mỹ nữ)
-        piercings: false, // Lỗ xỏ khuyên sai quy định
-        keloids: false, // Sẹo lồi vùng hở
+        height: 165,
+        weight: 60,
+
+        // 2. KHÁM MẮT 
+        visionLeftNoGlass: 10, visionLeftWithGlass: 10, sphereLeft: 0, cylinderLeft: 0,
+        visionRightNoGlass: 10, visionRightWithGlass: 10, sphereRight: 0, cylinderRight: 0,
+
+        // 3. BỆNH LÝ LÂM SÀNG
+        colorBlindness: false, hearingLoss: false, missingDigits: false,
+        flatFeet: false, chronicDiseases: false, stammering: false,
+
+        // 4. CHỈ SỐ ĐẶC THÙ (CƠ BẢN)
+        drugUse: false, hairColorIssue: false, skinPigmentation: false, keloids: false,
+
+        // 5. CHI TIẾT XĂM HÌNH (Theo Thông tư 62)
+        hasTattoo: false,
+        tattooContentOffensive: false, // Hình xăm có nội dung phản cảm/kích động/bạo lực không?
+        tattooLocation: 'hidden', // 'hidden' (kín) hoặc 'exposed' (lộ diện)
+        tattooSize: 0, // Kích thước (cm2)
+        tattooCoverHalfBody: false, // Có chiếm quá 1/2 lưng, ngực, bụng không?
+
+        // 6. CHI TIẾT XỎ KHUYÊN
+        hasPiercing: false,
+        piercingLocation: 'ear', // 'ear' (Tai) hoặc 'other' (Mũi, rốn, mày...)
+        piercingHealed: true, // (Dành cho Nam) Đã liền sẹo chưa?
+        piercingCountPerEar: 1, // (Dành cho Nữ) Số lỗ bấm trên 1 tai
     });
 
     const [result, setResult] = useState<{ passed: boolean, messages: string[] }>({ passed: true, messages: [] });
 
-    // Xử lý thay đổi input
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;
         let finalValue: string | number | boolean = value;
 
         if (type === 'checkbox') {
-            const checked = (e.target as HTMLInputElement).checked;
-            finalValue = checked;
+            finalValue = (e.target as HTMLInputElement).checked;
         } else if (type === 'number') {
             finalValue = Number(value);
         }
@@ -35,12 +52,11 @@ const HealthCheckCAND = () => {
         }));
     };
 
-    // Logic kiểm tra các điều kiện dựa trên Thông tư 62/2023/TT-BCA
     const evaluateHealth = () => {
         let passed = true;
         let messages: string[] = [];
 
-        // 1. Lấy khung chiều cao tiêu chuẩn dựa trên giới tính & ưu tiên
+        // --- 1. KIỂM TRA THỂ LỰC ---
         let minHeight = 0, maxHeight = 195;
         if (formData.gender === 'Nam') {
             switch (formData.priority) {
@@ -60,163 +76,383 @@ const HealthCheckCAND = () => {
             }
         }
 
-        // Đánh giá Chiều cao
         if (formData.height < minHeight || formData.height > maxHeight) {
             passed = false;
-            messages.push(`❌ Chiều cao không đạt. Yêu cầu đối với ${formData.gender} (${formData.priority}) là từ ${minHeight}cm đến ${maxHeight === 300 ? 'trở lên' : maxHeight + 'cm'}.`);
-        } else {
-            messages.push(`✅ Chiều cao: Đạt (${formData.height}cm)`);
+            messages.push(`❌ Chiều cao: Không đạt (Yêu cầu ${minHeight} - ${maxHeight === 300 ? 'trở lên' : maxHeight}cm).`);
         }
 
-        // 2. Đánh giá BMI (Chỉ số khối cơ thể)
         const bmi = Number((formData.weight / Math.pow(formData.height / 100, 2)).toFixed(1));
         if (bmi < 18.5 || bmi >= 30) {
             passed = false;
-            messages.push(`❌ BMI không đạt (${bmi}). Yêu cầu BMI từ 18.5 đến dưới 30.`);
-        } else {
-            messages.push(`✅ Cân nặng và BMI: Đạt (BMI = ${bmi})`);
+            messages.push(`❌ BMI: Không đạt (${bmi}). Yêu cầu từ 18.5 đến dưới 30.`);
         }
 
-        // 3. Đánh giá Thị lực
-        let maxDiopters = formData.priority === 'Trình độ ĐH KH-KT / Chuyên gia' ? 5 : 3;
-        if (formData.visionDefect && formData.diopters > maxDiopters) {
-            passed = false;
-            messages.push(`❌ Thị lực không đạt. Mức độ cận/viễn thị tối đa cho phép là ${maxDiopters} đi-ốp.`);
-        } else if (formData.visionDefect) {
-            messages.push(`✅ Thị lực: Chấp nhận tật khúc xạ ${formData.diopters} đi-ốp (Dưới ngưỡng ${maxDiopters}).`);
+        // --- 2. KIỂM TRA MẮT ---
+        const maxSphere = formData.priority === 'Trình độ ĐH KH-KT / Chuyên gia' ? 5 : 3;
+        const checkEye = (sphere: number, cylinder: number, side: string) => {
+            let isDefect = false;
+            if (Math.abs(sphere) > maxSphere) {
+                passed = false;
+                messages.push(`❌ Khúc xạ ${side}: Vượt quá quy định (${Math.abs(sphere)} > ${maxSphere} đi-ốp).`);
+                isDefect = true;
+            } else if (Math.abs(sphere) > 0) { isDefect = true; }
+
+            if (Math.abs(cylinder) >= 1) {
+                passed = false;
+                messages.push(`❌ Khúc xạ ${side}: Loạn thị không đạt (>= 1 đi-ốp).`);
+                isDefect = true;
+            } else if (Math.abs(cylinder) > 0) { isDefect = true; }
+            return isDefect;
+        };
+
+        const isLeftDefect = checkEye(formData.sphereLeft, formData.cylinderLeft, "Mắt Trái");
+        const isRightDefect = checkEye(formData.sphereRight, formData.cylinderRight, "Mắt Phải");
+
+        if (isLeftDefect || isRightDefect) {
+            if (formData.visionLeftWithGlass < 9 || formData.visionRightWithGlass < 9 || (formData.visionLeftWithGlass + formData.visionRightWithGlass) < 19) {
+                passed = false; messages.push(`❌ Thị lực qua kính: Không đạt (Mỗi mắt >= 9, Tổng >= 19).`);
+            }
         } else {
-            messages.push(`✅ Thị lực: Mặc định bình thường (Đạt)`);
+            if (formData.visionLeftNoGlass < 9 || formData.visionRightNoGlass < 9 || (formData.visionLeftNoGlass + formData.visionRightNoGlass) < 18) {
+                passed = false; messages.push(`❌ Thị lực không kính: Không đạt (Mỗi mắt >= 9, Tổng >= 18).`);
+            }
         }
 
-        // 4. Các chỉ số đặc thù (Hình xăm, Sẹo, Khuyên)
-        if (formData.tattoos) {
-            passed = false;
-            messages.push(`❌ Vi phạm chỉ số đặc thù: Có vết trổ, vết xăm trên da.`);
+        // --- 3. KIỂM TRA BỆNH LÝ & ĐẶC THÙ CƠ BẢN ---
+        const conditions = [
+            { key: 'drugUse', msg: 'Sử dụng ma túy, tiền chất.' },
+            { key: 'hairColorIssue', msg: 'Màu/dạng tóc sai quy định.' },
+            { key: 'skinPigmentation', msg: 'Rối loạn sắc tố da.' },
+            { key: 'keloids', msg: 'Sẹo lồi vùng hở.' },
+            { key: 'colorBlindness', msg: 'Mù màu / Rối loạn sắc giác.' },
+            { key: 'hearingLoss', msg: 'Bệnh lý tai (Điếc, Viêm tai giữa).' },
+            { key: 'missingDigits', msg: 'Thiếu ngón tay, chân.' },
+            { key: 'flatFeet', msg: 'Bàn chân bẹt nặng.' },
+            { key: 'chronicDiseases', msg: 'Bệnh mãn tính (Tim, Gan, HIV...).' },
+            { key: 'stammering', msg: 'Nói ngọng, nói lắp.' }
+        ];
+        conditions.forEach(cond => {
+            if (formData[cond.key as keyof typeof formData]) { passed = false; messages.push(`❌ Bệnh lý/Đặc thù: ${cond.msg}`); }
+        });
+
+        // --- 4. KIỂM TRA HÌNH XĂM ---
+        if (formData.hasTattoo) {
+            if (formData.tattooContentOffensive) {
+                passed = false; messages.push(`❌ Hình xăm: Chứa nội dung phản cảm, chính trị, bạo lực, kỳ dị.`);
+            } else if (formData.tattooCoverHalfBody) {
+                passed = false; messages.push(`❌ Hình xăm: Chiếm từ 1/2 diện tích lưng, ngực, bụng trở lên.`);
+            } else if (formData.tattooLocation === 'exposed' && formData.tattooSize > 2) {
+                passed = false; messages.push(`❌ Hình xăm lộ diện: Kích thước vượt quá quy định (> 2 cm²).`);
+            } else if (formData.tattooLocation === 'hidden' && formData.tattooSize > 20) {
+                passed = false; messages.push(`❌ Hình xăm vùng kín: Kích thước vượt quá quy định (> 20 cm²).`);
+            } else {
+                messages.push(`✅ Hình xăm: Đạt điều kiện châm chước (nhỏ, không phản cảm).`);
+            }
         }
-        if (formData.piercings) {
-            passed = false;
-            messages.push(`❌ Vi phạm chỉ số đặc thù: Lỗ xỏ khuyên sai quy định.`);
+
+        // --- 5. KIỂM TRA XỎ KHUYÊN ---
+        if (formData.hasPiercing) {
+            if (formData.piercingLocation === 'other') {
+                passed = false; messages.push(`❌ Xỏ khuyên: Không được phép bấm lỗ ở mũi hoặc vị trí khác ngoài tai.`);
+            } else if (formData.gender === 'Nam' && !formData.piercingHealed) {
+                passed = false; messages.push(`❌ Xỏ khuyên (Nam): Lỗ bấm ở tai chưa liền thành sẹo.`);
+            } else if (formData.gender === 'Nữ' && formData.piercingCountPerEar > 1) {
+                passed = false; messages.push(`❌ Xỏ khuyên (Nữ): Có từ 02 lỗ bấm trở lên trên 01 tai.`);
+            } else {
+                messages.push(`✅ Xỏ khuyên: Đạt điều kiện chấp nhận được.`);
+            }
         }
-        if (formData.keloids) {
-            passed = false;
-            messages.push(`❌ Vi phạm chỉ số đặc thù: Sẹo lồi co kéo ở vùng đầu, mặt, cổ, tay, chân.`);
+
+        if (passed) {
+            messages.push(`✅ Thể lực & Chỉ số: Hoàn toàn đạt chuẩn.`);
         }
 
         setResult({ passed, messages });
     };
 
-    useEffect(() => {
-        evaluateHealth();
-    }, [formData]);
+    useEffect(() => { evaluateHealth(); }, [formData]);
 
     return (
-        <div className="max-w-3xl mx-auto p-6 lg:p-10 bg-white shadow-xl rounded-2xl font-sans text-slate-800 border border-slate-100">
+        <div className="max-w-7xl mx-auto p-6 lg:p-10 bg-white shadow-xl rounded-2xl font-sans text-slate-800 border border-slate-100">
+
+            {/* Header */}
             <div className="flex items-center space-x-4 mb-8 border-b border-slate-100 pb-6">
-                {/* Biểu tượng CAND SVG đơn giản */}
-                <div className="w-14 h-14 bg-police-50 rounded-2xl flex items-center justify-center shrink-0">
-                    <svg className="w-8 h-8 text-police-dark" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 2L3 6v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V6l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V7.49l7-3.11v8.61z" />
+                <div className="w-14 h-14 bg-gradient-to-br from-police-light to-police-dark rounded-2xl flex items-center justify-center shrink-0 shadow-lg shadow-police-light/30">
+                    <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2L3 6v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V6l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z" />
                     </svg>
                 </div>
                 <div>
-                    <h2 className="text-2xl lg:text-3xl font-extrabold text-police-dark">Kiểm tra Yêu cầu Sức khỏe CAND</h2>
-                    <p className="text-slate-500 text-sm mt-1">Dựa trên Thông tư 62/2023/TT-BCA</p>
+                    <h2 className="text-2xl lg:text-3xl font-extrabold text-police-dark uppercase">Hệ Thống Đánh Giá Sức Khỏe CAND</h2>
+                    <p className="text-slate-500 text-sm mt-1">Chi tiết theo tiêu chuẩn Thông tư 62/2023/TT-BCA mới nhất</p>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                {/* Giới tính */}
-                <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Giới tính</label>
-                    <select name="gender" value={formData.gender} onChange={handleChange} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 font-medium transition cursor-pointer outline-none">
-                        <option value="Nam">Nam</option>
-                        <option value="Nữ">Nữ</option>
-                    </select>
-                </div>
-
-                {/* Diện ưu tiên */}
-                <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Diện xét tuyển / Ưu tiên</label>
-                    <select name="priority" value={formData.priority} onChange={handleChange} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 font-medium transition cursor-pointer outline-none text-sm">
-                        <option value="Bình thường">Học sinh/Thí sinh Bình thường</option>
-                        <option value="Dân tộc thiểu số">Người Dân tộc thiểu số</option>
-                        <option value="Nhóm UT1">Đối tượng ưu tiên 01 Nhóm UT1</option>
-                        <option value="Tuyển thẳng THPT">Tuyển thẳng / Xét tuyển THPT</option>
-                        <option value="Trình độ ĐH KH-KT / Chuyên gia">Có bằng ĐH kỹ thuật / Chuyên gia, TS</option>
-                    </select>
-                </div>
-
-                {/* Chiều cao */}
-                <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Chiều cao (cm)</label>
-                    <input type="number" name="height" value={formData.height} onChange={handleChange} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 font-medium transition outline-none" min={100} max={250} />
-                </div>
-
-                {/* Cân nặng */}
-                <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Cân nặng (kg)</label>
-                    <input type="number" name="weight" value={formData.weight} onChange={handleChange} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 font-medium transition outline-none" min={30} max={150} />
-                </div>
-            </div>
-
-            <div className="mb-8 bg-blue-50/50 border border-blue-100 p-5 rounded-2xl">
-                <h3 className="font-bold text-blue-900 mb-4 flex items-center gap-2">
-                    <span className="text-blue-500">🏥</span> Tình trạng đặc thù (Nhấn chọn nếu mắc phải)
-                </h3>
-
-                <div className="space-y-4">
-                    <label className="flex items-center space-x-3 cursor-pointer group">
-                        <input type="checkbox" name="visionDefect" checked={formData.visionDefect} onChange={handleChange} className="w-5 h-5 text-blue-600 rounded border-slate-300 focus:ring-blue-500/30" />
-                        <span className="font-medium text-slate-700 group-hover:text-blue-700 transition">Mắt bị tật khúc xạ (Cận thị / Viễn thị / Loạn thị)</span>
-                    </label>
-
-                    {formData.visionDefect && (
-                        <div className="ml-8 flex items-center space-x-3 bg-white p-3 rounded-xl border border-blue-100 shadow-sm inline-flex">
-                            <span className="text-sm font-bold text-slate-600">Độ cao nhất:</span>
-                            <input type="number" step="0.25" name="diopters" value={formData.diopters} onChange={handleChange} className="w-24 p-2 border border-slate-200 rounded-lg text-sm font-bold outline-none focus:border-blue-400" min={0} max={20} />
-                            <span className="text-sm text-slate-500 font-medium">đi-ốp</span>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
+                {/* CỘT TRÁI (3/12): THỂ LỰC & ƯU TIÊN */}
+                <div className="col-span-12 lg:col-span-3 space-y-6">
+                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                        <h3 className="font-bold text-slate-800 mb-5 border-b border-slate-200 pb-3 uppercase text-sm flex items-center gap-2">
+                            <span className="w-6 h-6 rounded bg-police-light text-white flex items-center justify-center text-xs">1</span> Thể lực
+                        </h3>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-[11px] font-bold text-slate-600 mb-1.5 uppercase">Giới tính</label>
+                                <select name="gender" value={formData.gender} onChange={handleChange} className="w-full p-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-police-light/30 outline-none text-sm cursor-pointer">
+                                    <option value="Nam">Nam</option>
+                                    <option value="Nữ">Nữ</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-[11px] font-bold text-slate-600 mb-1.5 uppercase">Diện Xét tuyển</label>
+                                <select name="priority" value={formData.priority} onChange={handleChange} className="w-full p-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-police-light/30 outline-none text-sm cursor-pointer">
+                                    <option value="Bình thường">Bình thường</option>
+                                    <option value="Dân tộc thiểu số">Dân tộc TS</option>
+                                    <option value="Nhóm UT1">Nhóm UT1</option>
+                                    <option value="Tuyển thẳng THPT">Tuyển thẳng</option>
+                                    <option value="Trình độ ĐH KH-KT / Chuyên gia">ĐH Kỹ thuật / Chuyên gia</option>
+                                </select>
+                            </div>
+                            <div className="flex space-x-3">
+                                <div className="w-1/2">
+                                    <label className="block text-[11px] font-bold text-slate-600 mb-1.5 uppercase">Chiều cao (cm)</label>
+                                    <input type="number" name="height" value={formData.height} onChange={handleChange} className="w-full p-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-police-light/30 outline-none text-sm text-center" />
+                                </div>
+                                <div className="w-1/2">
+                                    <label className="block text-[11px] font-bold text-slate-600 mb-1.5 uppercase">Cân nặng (kg)</label>
+                                    <input type="number" name="weight" value={formData.weight} onChange={handleChange} className="w-full p-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-police-light/30 outline-none text-sm text-center" />
+                                </div>
+                            </div>
                         </div>
-                    )}
+                    </div>
 
-                    <label className="flex items-center space-x-3 cursor-pointer group">
-                        <input type="checkbox" name="tattoos" checked={formData.tattoos} onChange={handleChange} className="w-5 h-5 text-blue-600 rounded border-slate-300 focus:ring-blue-500/30" />
-                        <span className="font-medium text-slate-700 group-hover:text-blue-700 transition">Có hình xăm, vết trổ trên da (trừ xăm thẩm mỹ chân mày/môi ở Nữ)</span>
-                    </label>
+                    <div className="bg-rose-50/50 p-5 rounded-2xl border border-rose-100">
+                        <h3 className="font-bold text-rose-800 mb-4 border-b border-rose-200 pb-3 uppercase text-sm flex items-center gap-2">
+                            <span className="w-6 h-6 rounded bg-rose-500 text-white flex items-center justify-center text-xs">2</span> Bệnh lý nền
+                        </h3>
+                        <div className="space-y-2.5 text-xs font-medium">
+                            <label className="flex items-center space-x-3 cursor-pointer group bg-white p-2 rounded-lg border border-transparent hover:border-rose-200 transition">
+                                <input type="checkbox" name="colorBlindness" checked={formData.colorBlindness} onChange={handleChange} className="w-4 h-4 text-rose-600 border-slate-300 focus:ring-rose-500 rounded" />
+                                <span className="group-hover:text-rose-700">Mù màu / Rối loạn sắc giác</span>
+                            </label>
+                            <label className="flex items-center space-x-3 cursor-pointer group bg-white p-2 rounded-lg border border-transparent hover:border-rose-200 transition">
+                                <input type="checkbox" name="hearingLoss" checked={formData.hearingLoss} onChange={handleChange} className="w-4 h-4 text-rose-600 border-slate-300 focus:ring-rose-500 rounded" />
+                                <span className="group-hover:text-rose-700">Điếc / Viêm tai giữa</span>
+                            </label>
+                            <label className="flex items-center space-x-3 cursor-pointer group bg-white p-2 rounded-lg border border-transparent hover:border-rose-200 transition">
+                                <input type="checkbox" name="missingDigits" checked={formData.missingDigits} onChange={handleChange} className="w-4 h-4 text-rose-600 border-slate-300 focus:ring-rose-500 rounded" />
+                                <span className="group-hover:text-rose-700">Thiếu ngón tay/chân</span>
+                            </label>
+                            <label className="flex items-center space-x-3 cursor-pointer group bg-white p-2 rounded-lg border border-transparent hover:border-rose-200 transition">
+                                <input type="checkbox" name="flatFeet" checked={formData.flatFeet} onChange={handleChange} className="w-4 h-4 text-rose-600 border-slate-300 focus:ring-rose-500 rounded" />
+                                <span className="group-hover:text-rose-700">Bàn chân bẹt nặng</span>
+                            </label>
+                            <label className="flex items-center space-x-3 cursor-pointer group bg-white p-2 rounded-lg border border-transparent hover:border-rose-200 transition">
+                                <input type="checkbox" name="chronicDiseases" checked={formData.chronicDiseases} onChange={handleChange} className="w-4 h-4 text-rose-600 border-slate-300 focus:ring-rose-500 rounded" />
+                                <span className="group-hover:text-rose-700">Tim, Viêm gan, Hen, HIV...</span>
+                            </label>
+                            <label className="flex items-center space-x-3 cursor-pointer group bg-white p-2 rounded-lg border border-transparent hover:border-rose-200 transition">
+                                <input type="checkbox" name="stammering" checked={formData.stammering} onChange={handleChange} className="w-4 h-4 text-rose-600 border-slate-300 focus:ring-rose-500 rounded" />
+                                <span className="group-hover:text-rose-700">Nói ngọng, nói lắp</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
 
-                    <label className="flex items-center space-x-3 cursor-pointer group">
-                        <input type="checkbox" name="piercings" checked={formData.piercings} onChange={handleChange} className="w-5 h-5 text-blue-600 rounded border-slate-300 focus:ring-blue-500/30" />
-                        <span className="font-medium text-slate-700 group-hover:text-blue-700 transition">Xỏ khuyên sai quy định (Nam có khuyên, Nữ &gt; 1 lỗ/tai)</span>
-                    </label>
+                {/* CỘT GIỮA (4/12): KHÁM MẮT */}
+                <div className="col-span-12 lg:col-span-4 bg-blue-50/50 p-6 rounded-2xl border border-blue-100">
+                    <h3 className="font-bold text-blue-900 mb-2 uppercase text-sm flex items-center gap-2">
+                        <span className="w-6 h-6 rounded bg-blue-500 text-white flex items-center justify-center text-xs">3</span> Khúc xạ & Thị lực
+                    </h3>
+                    <p className="text-[11px] text-blue-600/70 mb-5 font-medium pb-4 border-b border-blue-200">
+                        * Cận nhập số âm (-), Viễn nhập số dương (+). Đơn vị đi-ốp.
+                    </p>
 
-                    <label className="flex items-center space-x-3 cursor-pointer group">
-                        <input type="checkbox" name="keloids" checked={formData.keloids} onChange={handleChange} className="w-5 h-5 text-blue-600 rounded border-slate-300 focus:ring-blue-500/30" />
-                        <span className="font-medium text-slate-700 group-hover:text-blue-700 transition">Có sẹo lồi co kéo ở vùng hở (đầu, mặt, cổ, tay, chân)</span>
-                    </label>
+                    <div className="space-y-4">
+                        {/* MẮT TRÁI */}
+                        <div className="p-4 bg-white rounded-xl border border-blue-200 shadow-sm relative overflow-hidden">
+                            <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
+                            <span className="font-bold text-sm text-slate-800 mb-3 block pl-2">MẮT TRÁI</span>
+                            <div className="space-y-3 pl-2">
+                                <div className="grid grid-cols-2 gap-3 pb-3 border-b border-slate-100">
+                                    <div>
+                                        <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Độ Cận/Viễn</label>
+                                        <input type="number" step="0.25" name="sphereLeft" value={formData.sphereLeft} onChange={handleChange} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 text-center" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Độ Loạn</label>
+                                        <input type="number" step="0.25" min="0" name="cylinderLeft" value={formData.cylinderLeft} onChange={handleChange} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 text-center" />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-500 mb-1 h-7">Thị lực<br />MẮT THƯỜNG</label>
+                                        <input type="number" min="0" max="10" name="visionLeftNoGlass" value={formData.visionLeftNoGlass} onChange={handleChange} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 text-center text-blue-600" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-500 mb-1 h-7">Thị lực<br />ĐEO KÍNH</label>
+                                        <input type="number" min="0" max="10" name="visionLeftWithGlass" value={formData.visionLeftWithGlass} onChange={handleChange} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 text-center text-blue-800 disabled:opacity-50" disabled={formData.sphereLeft == 0 && formData.cylinderLeft == 0} />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* MẮT PHẢI */}
+                        <div className="p-4 bg-white rounded-xl border border-blue-200 shadow-sm relative overflow-hidden">
+                            <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
+                            <span className="font-bold text-sm text-slate-800 mb-3 block pl-2">MẮT PHẢI</span>
+                            <div className="space-y-3 pl-2">
+                                <div className="grid grid-cols-2 gap-3 pb-3 border-b border-slate-100">
+                                    <div>
+                                        <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Độ Cận/Viễn</label>
+                                        <input type="number" step="0.25" name="sphereRight" value={formData.sphereRight} onChange={handleChange} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 text-center" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Độ Loạn</label>
+                                        <input type="number" step="0.25" min="0" name="cylinderRight" value={formData.cylinderRight} onChange={handleChange} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 text-center" />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-500 mb-1 h-7">Thị lực<br />MẮT THƯỜNG</label>
+                                        <input type="number" min="0" max="10" name="visionRightNoGlass" value={formData.visionRightNoGlass} onChange={handleChange} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 text-center text-blue-600" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-500 mb-1 h-7">Thị lực<br />ĐEO KÍNH</label>
+                                        <input type="number" min="0" max="10" name="visionRightWithGlass" value={formData.visionRightWithGlass} onChange={handleChange} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 text-center text-blue-800 disabled:opacity-50" disabled={formData.sphereRight == 0 && formData.cylinderRight == 0} />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* CỘT PHẢI (5/12): CHỈ SỐ ĐẶC THÙ (XĂM, KHUYÊN...) */}
+                <div className="col-span-12 lg:col-span-5 bg-orange-50/50 p-6 rounded-2xl border border-orange-100">
+                    <h3 className="font-bold text-orange-900 mb-5 border-b border-orange-200 pb-3 uppercase text-sm flex items-center gap-2">
+                        <span className="w-6 h-6 rounded bg-orange-500 text-white flex items-center justify-center text-xs">4</span> Đặc thù (Xăm, Khuyên, Da)
+                    </h3>
+
+                    <div className="space-y-5">
+                        {/* BOX: XEM XÉT CƠ BẢN */}
+                        <div className="grid grid-cols-2 gap-2 text-[11px] font-bold bg-white p-3 rounded-xl border border-orange-200 shadow-sm">
+                            <label className="flex items-center space-x-2 p-1.5 rounded hover:bg-orange-50 cursor-pointer transition"><input type="checkbox" name="drugUse" checked={formData.drugUse} onChange={handleChange} className="w-3.5 h-3.5 text-orange-600 rounded border-slate-300 focus:ring-orange-500" /><span className="text-slate-700">Nghiện ma túy</span></label>
+                            <label className="flex items-center space-x-2 p-1.5 rounded hover:bg-orange-50 cursor-pointer transition"><input type="checkbox" name="hairColorIssue" checked={formData.hairColorIssue} onChange={handleChange} className="w-3.5 h-3.5 text-orange-600 rounded border-slate-300 focus:ring-orange-500" /><span className="text-slate-700">Nhuộm tóc sai quy định</span></label>
+                            <label className="flex items-center space-x-2 p-1.5 rounded hover:bg-orange-50 cursor-pointer transition"><input type="checkbox" name="skinPigmentation" checked={formData.skinPigmentation} onChange={handleChange} className="w-3.5 h-3.5 text-orange-600 rounded border-slate-300 focus:ring-orange-500" /><span className="text-slate-700">Rối loạn sắc tố da</span></label>
+                            <label className="flex items-center space-x-2 p-1.5 rounded hover:bg-orange-50 cursor-pointer transition"><input type="checkbox" name="keloids" checked={formData.keloids} onChange={handleChange} className="w-3.5 h-3.5 text-orange-600 rounded border-slate-300 focus:ring-orange-500" /><span className="text-slate-700">Sẹo lồi vùng hở</span></label>
+                        </div>
+
+                        {/* BOX: XĂM HÌNH */}
+                        <div className="bg-white rounded-xl border border-orange-200 shadow-sm p-4 overflow-hidden">
+                            <label className="flex items-center space-x-3 font-extrabold text-sm text-slate-800 cursor-pointer">
+                                <input type="checkbox" name="hasTattoo" checked={formData.hasTattoo} onChange={handleChange} className="w-5 h-5 text-orange-600 rounded border-slate-300 focus:ring-orange-500" />
+                                <span>CÓ VẾT TRỔ / XĂM TRÊN DA</span>
+                            </label>
+
+                            {formData.hasTattoo && (
+                                <div className="mt-4 pl-4 space-y-4 border-l-2 border-orange-300 animate-in slide-in-from-top-2 duration-200">
+                                    <label className="flex items-start space-x-3 text-xs p-2 bg-rose-50 rounded-lg cursor-pointer hover:bg-rose-100 transition">
+                                        <input type="checkbox" name="tattooContentOffensive" checked={formData.tattooContentOffensive} onChange={handleChange} className="w-4 h-4 text-rose-600 mt-0.5 rounded focus:ring-rose-500" />
+                                        <span className="text-rose-800 font-bold leading-snug">Nội dung phản cảm, chống phá, bạo lực, kỳ dị</span>
+                                    </label>
+
+                                    <div className="text-xs">
+                                        <label className="block mb-1.5 font-bold text-slate-600 uppercase">Vị trí hình xăm:</label>
+                                        <select name="tattooLocation" value={formData.tattooLocation} onChange={handleChange} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-orange-400 font-medium">
+                                            <option value="hidden">Vùng Kín (Lưng, ngực, bụng, đùi trên...)</option>
+                                            <option value="exposed">Lộ Diện (Mặt, đầu, cổ, tay dưới, chân dưới...)</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="flex items-center justify-between text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                                        <span className="font-bold text-slate-700 uppercase">Tổng diện tích:</span>
+                                        <div className="relative">
+                                            <input type="number" name="tattooSize" value={formData.tattooSize} onChange={handleChange} className="w-24 p-2 pl-3 pr-10 border border-slate-200 rounded-md text-right font-bold outline-none focus:border-orange-400" />
+                                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400">cm²</span>
+                                        </div>
+                                    </div>
+
+                                    {formData.tattooLocation === 'hidden' && (
+                                        <label className="flex items-start space-x-3 text-xs bg-orange-50/50 p-2.5 rounded-lg cursor-pointer hover:bg-orange-50 transition border border-orange-100">
+                                            <input type="checkbox" name="tattooCoverHalfBody" checked={formData.tattooCoverHalfBody} onChange={handleChange} className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500" />
+                                            <span className="text-slate-800 font-semibold leading-snug">Chiếm trên 1/2 diện tích Lưng / Ngực / Bụng</span>
+                                        </label>
+                                    )}
+                                    <p className="text-[10px] text-orange-600/80 font-medium italic">* Vùng lộ diện tối đa 2cm². Vùng kín tối đa 20cm².</p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* BOX: XỎ KHUYÊN */}
+                        <div className="bg-white rounded-xl border border-orange-200 shadow-sm p-4 overflow-hidden">
+                            <label className="flex items-center space-x-3 font-extrabold text-sm text-slate-800 cursor-pointer">
+                                <input type="checkbox" name="hasPiercing" checked={formData.hasPiercing} onChange={handleChange} className="w-5 h-5 text-orange-600 rounded border-slate-300 focus:ring-orange-500" />
+                                <span>CÓ LỖ XỎ KHUYÊN / BẤM LỖ</span>
+                            </label>
+
+                            {formData.hasPiercing && (
+                                <div className="mt-4 pl-4 space-y-4 border-l-2 border-orange-300 animate-in slide-in-from-top-2 duration-200 text-xs">
+                                    <div>
+                                        <label className="block mb-1.5 font-bold text-slate-600 uppercase">Vị trí xỏ khuyên:</label>
+                                        <select name="piercingLocation" value={formData.piercingLocation} onChange={handleChange} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-orange-400 font-medium">
+                                            <option value="ear">Ở Tai</option>
+                                            <option value="other">Vị trí khác (Mũi, rốn, mày, lưỡi...)</option>
+                                        </select>
+                                    </div>
+
+                                    {formData.piercingLocation === 'ear' && formData.gender === 'Nam' && (
+                                        <label className="flex items-center space-x-3 bg-emerald-50/50 p-3 rounded-lg border border-emerald-100 cursor-pointer hover:bg-emerald-50 transition">
+                                            <input type="checkbox" name="piercingHealed" checked={formData.piercingHealed} onChange={handleChange} className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500" />
+                                            <span className="font-bold text-emerald-800">Lỗ bấm tai đã liền thành sẹo</span>
+                                        </label>
+                                    )}
+
+                                    {formData.piercingLocation === 'ear' && formData.gender === 'Nữ' && (
+                                        <div className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                            <span className="font-bold text-slate-700 uppercase">Số lỗ bấm trên MỘT tai:</span>
+                                            <input type="number" min="1" max="5" name="piercingCountPerEar" value={formData.piercingCountPerEar} onChange={handleChange} className="w-16 p-2 border border-slate-200 rounded text-center font-bold outline-none focus:border-orange-400" />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            {/* Box Kết quả đánh giá */}
-            <div className={`p-6 rounded-2xl border-2 ${result.passed ? 'border-emerald-400 bg-emerald-50' : 'border-rose-400 bg-rose-50'}`}>
-                <div className="flex items-center space-x-4 mb-4">
-                    <div className={`text-5xl ${result.passed ? 'text-emerald-500' : 'text-rose-500'}`}>
-                        {result.passed ? '👮‍♂️ ✅' : '👮‍♂️ ❌'}
+            {/* BOX KẾT QUẢ ĐÁNH GIÁ */}
+            <div className={`p-8 rounded-2xl border-2 shadow-sm ${result.passed ? 'border-emerald-400 bg-emerald-50' : 'border-rose-400 bg-rose-50'}`}>
+                <div className="flex items-center space-x-5 mb-6">
+                    <div className="text-6xl drop-shadow-md transition-transform hover:scale-110">
+                        {result.passed ? '👮‍♂️ ✅' : '⚠️ ❌'}
                     </div>
                     <div>
-                        <h3 className={`text-xl lg:text-2xl font-extrabold ${result.passed ? 'text-emerald-700' : 'text-rose-700'}`}>
-                            {result.passed ? 'ĐỦ ĐIỀU KIỆN SỨC KHỎE (DỰ KIẾN)' : 'CHƯA ĐẠT YÊU CẦU SỨC KHỎE'}
+                        <h3 className={`text-2xl lg:text-3xl font-black tracking-tight uppercase ${result.passed ? 'text-emerald-700' : 'text-rose-700'}`}>
+                            {result.passed ? 'ĐỦ ĐIỀU KIỆN SỨC KHỎE' : 'CHƯA ĐẠT CHUẨN'}
                         </h3>
+                        <p className={`text-sm mt-1 font-semibold ${result.passed ? 'text-emerald-600/80' : 'text-rose-600/80'}`}>
+                            DỰ ĐOÁN TỰ ĐỘNG DỰA TRÊN THÔNG TƯ 62/2023/TT-BCA
+                        </p>
                     </div>
                 </div>
 
-                <ul className="space-y-2 mt-5 text-sm md:text-base border-t border-black/5 pt-4">
-                    {result.messages.map((msg, idx) => (
-                        <li key={idx} className={`font-semibold ${msg.includes('❌') ? 'text-rose-600' : 'text-emerald-700'}`}>
-                            {msg}
-                        </li>
-                    ))}
-                </ul>
-                <p className="mt-5 text-xs text-slate-500 italic leading-relaxed">
-                    * Lưu ý: Kết quả mang tính tham khảo nhanh dựa trên các chỉ số tự nhập theo Thông tư 62/2023/TT-BCA. Quyết định cuối cùng phụ thuộc vào Hội đồng khám sức khỏe y tế thực tế tại địa phương/đơn vị xơ tuyển.
+                <div className="bg-white/90 p-5 rounded-xl shadow-sm border border-slate-200/60">
+                    <ul className="space-y-3 text-[15px]">
+                        {result.messages.map((msg, idx) => {
+                            const fails = msg.includes('❌');
+                            return (
+                                <li key={idx} className={`flex items-start ${fails ? 'text-rose-700 font-bold' : 'text-emerald-800 font-medium'}`}>
+                                    <span className={`mr-2 flex-shrink-0 text-lg ${fails ? '' : ''}`}>
+                                        {fails ? '•' : '✓'}
+                                    </span>
+                                    <span className="leading-snug pt-1">{msg.replace(/[❌✅]/g, '').trim()}</span>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </div>
+                <p className="mt-6 text-xs text-slate-500/80 italic font-medium leading-relaxed">
+                    * Tuân thủ Thông tư 62/2023/TT-BCA của Bộ Công an. Quyết định chính thức phụ thuộc vào Hội đồng khám sức khỏe y tế tại địa phương tương ứng với chỉ tiêu tuyển sinh hiện tại của các trường Đại học/Học viện CAND. Mọi đánh giá tại website này đều chỉ mang tính tham khảo nhanh.
                 </p>
             </div>
         </div>

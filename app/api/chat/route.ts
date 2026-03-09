@@ -14,21 +14,23 @@ const WINDOW_MS = 60 * 1000;
 const conversationStore = new Map<string, { role: string, content: string }[]>();
 const MAX_HISTORY = 10;
 
-const SYSTEM_PROMPT = `
-BẠN LÀ TRỢ LÝ AI TƯ VẤN TUYỂN SINH CỦA CÔNG AN TỈNH CAO BẰNG - PHÒNG TỔ CHỨC CÁN BỘ.
+const currentYear = new Date().getFullYear();
 
-QUY TẮC TRẢ LỜI:
-- Lịch sự, thân thiện, chuyên nghiệp
-- Trả lời ngắn gọn, súc tích, dễ hiểu
-- Luôn trả lời bằng tiếng Việt
-- KHÔNG dùng LaTeX ($$ hay $), viết công thức bằng text thuần 
-  Ví dụ: "ĐXT = (M1+M2+M3) x 2/5 + BTBCA x 3/5 + ĐC"
-- Dùng bullet points (-) và số thứ tự (1., 2., 3.) rõ ràng
-- Bôi đậm từ khóa quan trọng bằng **dấu sao**
-- Dùng emoji: 📌 thông tin quan trọng, ✅ điều kiện, 💡 lưu ý, 🎯 mục tiêu
-- Nếu không biết thông tin, khuyên liên hệ Phòng TCCB - Công an tỉnh Cao Bằng
-- NHỚ NGỮ CẢNH: tham chiếu câu hỏi/trả lời trước đó
-- "năm nay" = 2026, "năm trước" = 2025
+const SYSTEM_PROMPT = `
+BẠN LÀ TRỢ LÝ AI TƯ VẤN TUYỂN SINH CỦA CÔNG AN TỈNH CAO BẰNG.
+⏰ THỜI GIAN HIỆN TẠI (Năm nay): ${currentYear}.
+
+QUY TẮC TRẢ LỜI NGHIÊM NGẶT:
+- Lịch sự, thân thiện, trả lời dễ hiểu bằng tiếng Việt.
+- Dùng bullet points và dấu sao **in đậm** từ khóa. Luôn dùng emoji (📌,✅,💡).
+- KHÔNG dùng Math/LaTeX. Không bốc phét.
+
+QUY TẮC THỜI GIAN VÀ CHỐNG SUY DIỄN (ANTI-HALLUCINATION):
+1. ƯU TIÊN THỜI GIAN: Nếu thí sinh hỏi về "năm nay", hãy ƯU TIÊN TUYỆT ĐỐI tìm kiếm và lọc các thông tin của [Tài Liệu - Năm: ${currentYear}]. Lờ đi các tài liệu cũ nếu thông tin xung đột.
+2. NẾU THIẾU DỮ LIỆU NĂM NAY: Nếu TẤT CẢ [Tài Liệu] bên dưới đều là của các năm trước (vd: ${currentYear - 1}), hãy MỞ ĐẦU câu trả lời: "Hiện tại Hệ thống chưa cập nhật văn bản hướng dẫn chính thức cho năm ${currentYear}. Theo quy định gần nhất là năm cũ, bạn có thể tham khảo..."
+3. DẪN CHIẾU VĂN BẢN: Nếu tài liệu năm ${currentYear} có nhắc đến "thực hiện theo" một văn bản cũ (ví dụ: Thông tư 62 năm 2023), tự động đối chiếu nội dung của văn bản cũ đó trong đống [Tài Liệu] được cấp để trả lời.
+4. KILL-SWITCH (DẬP TẮT SUY DIỄN): Tuyệt đối KHÔNG BỊA ĐẶT nội dung luật nằm ngoài [Tài Liệu] bên dưới. Nếu [Tài Liệu] bắt phải tuân theo Thông tư 62, nhưng CHÍNH QUÁ TRÌNH LỤC TÌM BÊN DƯỚI lại KHÔNG HỀ CÓ nội dung chi tiết của Thông tư 62, PHẢI THÚ NHẬN: 
+   "Theo hướng dẫn mới nhất, thí sinh cần tham chiếu Thông tư/văn bản liên quan. Tuy nhiên, nội dung chi tiết của văn bản phần này chưa được Quản trị viên cập nhật vào Hệ thống kho dữ liệu Trợ lý ảo. Bạn vui lòng liên hệ Đường dây nóng của Hội đồng tuyển sinh - Phòng TCCB Công an Tỉnh để được tư vấn chính xác!"
 `;
 
 export async function POST(req: NextRequest) {
@@ -99,9 +101,10 @@ export async function POST(req: NextRequest) {
 
     // --- VECTOR SEARCH (RAG) ---
     console.log(`[Chat] Generating embedding for query...`);
-    // 1. Nhúng (Embed) câu hỏi của user
+    // 1. Nhúng (Embed) câu hỏi của user: Bỏ "Năm XXXX" ra khỏi query để tránh làm nhiễu semantic context.
+    const optimizedQuery = message;
     const embeddingModel = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
-    const embedResult = await embeddingModel.embedContent(message);
+    const embedResult = await embeddingModel.embedContent(optimizedQuery);
     const queryVector = embedResult.embedding.values;
 
     // 2. Tìm kiếm trong Supabase sử dụng RPC match_documents
@@ -109,7 +112,7 @@ export async function POST(req: NextRequest) {
     const { data: matchedDocs, error: matchError } = await supabase.rpc('match_documents', {
       query_embedding: queryVector,
       match_threshold: 0.5, // Ngưỡng độ chính xác (0.0 đến 1.0)
-      match_count: 8        // Lấy 8 đoạn văn bản gần nhất
+      match_count: 25       // ✅ HUGE CONTEXT: Lấy 25 mảnh để gom sạch các văn bản dẫn chiếu chéo của năm cũ
     });
 
     if (matchError) {
@@ -119,23 +122,26 @@ export async function POST(req: NextRequest) {
     // 3. Xây dựng Context từ tài liệu tìm được
     let knowledgeContext = '';
     if (matchedDocs && matchedDocs.length > 0) {
-      const docsContent = matchedDocs.map((doc: any, index: number) => `[Tài Liệu ${index + 1}]:\n${doc.content}`).join('\n\n');
-      knowledgeContext = `\n\nDƯỚI ĐÂY LÀ CÁC THÔNG TIN TRÍCH XUẤT TỪ TÀI LIỆU HƯỚNG DẪN TUYỂN SINH. Việc trả lời PHẢI dựa trên thông tin này:\n\n${docsContent}\n`;
+      // ✅ Bơm Metadata Năm ban hành thẳng vào chữ
+      const docsContent = matchedDocs.map((doc: any, index: number) =>
+        `[Tài Liệu ${index + 1} - Năm: ${doc.year || 'Chưa rõ'} - Nguồn: ${doc.metadata?.source || 'Khuyết danh'}]: \n${doc.content} `
+      ).join('\n\n--- Dấu phân Cách ---\n\n');
+      knowledgeContext = `\n\n⬇️ DƯỚI ĐÂY LÀ KHO DỮ LIỆU ĐƯỢC CHẮT LỌC.CẤM BỊA ĐẶT NÀO NẰM NGOÀI: \n\n${docsContent} \n`;
     }
 
     // Build prompt
-    const prompt = `${SYSTEM_PROMPT}${knowledgeContext}${conversationContext}\n\nCâu hỏi hiện tại: ${message}\n\nTrả lời:`;
+    const prompt = `${SYSTEM_PROMPT}${knowledgeContext}${conversationContext} \n\nCâu hỏi hiện tại: ${message} \n\nTrả lời: `;
 
-    console.log(`[Chat] Prompt size: ${Math.round(prompt.length / 1024)}KB, starting Gemini call at +${Date.now() - startTime}ms`);
+    console.log(`[Chat] Prompt size: ${Math.round(prompt.length / 1024)} KB, starting Gemini call at + ${Date.now() - startTime} ms`);
 
     // Call Gemini
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
 
-    console.log(`[Chat] Gemini responded at +${Date.now() - startTime}ms`);
+    console.log(`[Chat] Gemini responded at + ${Date.now() - startTime} ms`);
 
     // Save AI response to history
     history.push({ role: 'model', content: text });
@@ -154,7 +160,7 @@ export async function POST(req: NextRequest) {
       ? '❌ Lỗi API Key. Vui lòng kiểm tra GEMINI_API_KEY trong Vercel.'
       : error?.message?.includes('abort') || error?.message?.includes('timeout')
         ? '⏰ Hệ thống phản hồi chậm. Vui lòng thử lại.'
-        : `❌ Lỗi: ${error?.message?.substring(0, 100) || 'Không xác định'}`;
+        : `❌ Lỗi: ${error?.message?.substring(0, 100) || 'Không xác định'} `;
 
     return NextResponse.json({
       response: errorMsg,

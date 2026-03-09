@@ -12,6 +12,9 @@ import fs from 'fs';
 import path from 'path';
 import mammoth from 'mammoth';
 
+const CHUNK_SIZE = 5000;
+const CHUNK_OVERLAP = 1500;
+
 const DATA_RAG_DIR = path.join(process.cwd(), 'data', 'rag');
 const DOCUMENTS_DIR = path.join(DATA_RAG_DIR, 'documents');
 const PROCESSED_DIR = path.join(DATA_RAG_DIR, 'processed');
@@ -50,12 +53,24 @@ async function processDocument(filePath: string): Promise<void> {
   const stat = fs.statSync(filePath);
   const docId = `doc_${filename.replace(/\.[^/.]+$/, "")}`; // Removes original extension
 
+  // Trích xuất Năm từ tên thư mục cha
+  const relativeFromDocuments = path.relative(DOCUMENTS_DIR, filePath);
+  const pathParts = relativeFromDocuments.split(path.sep);
+  let year: number | null = null;
+  if (pathParts.length > 1) {
+    const possibleYear = parseInt(pathParts[0], 10);
+    if (!isNaN(possibleYear)) {
+      year = possibleYear;
+    }
+  }
+
   const processedDoc = {
     id: docId,
     filename,
     content,
     type,
     metadata: {
+      year: year,
       filePath: path.relative(process.cwd(), filePath),
       size: stat.size,
       modified: stat.mtime.toISOString(),
@@ -73,13 +88,26 @@ async function main() {
   console.log(`📁 Documents: ${DOCUMENTS_DIR}`);
   console.log(`📁 Output:    ${PROCESSED_DIR}\n`);
 
-  const files = fs.readdirSync(DOCUMENTS_DIR).filter(f =>
-    !f.startsWith('.') && (f.endsWith('.txt') || f.endsWith('.docx'))
-  );
+  // Đọc lặp đệ quy tất cả các file trong thư mục DOCUMENTS_DIR và các thư mục con
+  function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
+    const files = fs.readdirSync(dirPath);
+    files.forEach((file) => {
+      if (!file.startsWith('.')) {
+        if (fs.statSync(dirPath + "/" + file).isDirectory()) {
+          arrayOfFiles = getAllFiles(dirPath + "/" + file, arrayOfFiles);
+        } else if (file.endsWith('.txt') || file.endsWith('.docx')) {
+          arrayOfFiles.push(path.join(dirPath, "/", file));
+        }
+      }
+    });
+    return arrayOfFiles;
+  }
+
+  const files = getAllFiles(DOCUMENTS_DIR);
 
   if (files.length === 0) {
     console.log('❌ Không có file nào trong data/rag/documents/');
-    console.log('   Hãy copy documents (.docx, .txt) vào thư mục trên rồi chạy lại.\n');
+    console.log('   Hãy tạo các thư mục tên Năm (vd: 2024, 2025, 2026) và copy documents vào đó rồi chạy lại.\n');
     return;
   }
 
@@ -88,7 +116,7 @@ async function main() {
   let processed = 0;
   for (const file of files) {
     try {
-      await processDocument(path.join(DOCUMENTS_DIR, file));
+      await processDocument(file); // filePath là Absolute Path từ getAllFiles
       processed++;
     } catch (error) {
       console.error(`❌ Lỗi xử lý ${file}:`, error);
