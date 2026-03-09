@@ -11,6 +11,8 @@
 import fs from 'fs';
 import path from 'path';
 import mammoth from 'mammoth';
+// @ts-ignore - pdf-parse v2 CJS
+const { PDFParse } = require('pdf-parse');
 
 const CHUNK_SIZE = 5000;
 const CHUNK_OVERLAP = 1500;
@@ -40,6 +42,13 @@ async function processDocument(filePath: string): Promise<void> {
     const result = await mammoth.extractRawText({ path: filePath });
     content = result.value;
     type = 'docx';
+  } else if (ext === '.pdf') {
+    const buffer = fs.readFileSync(filePath);
+    const parser = new PDFParse({ data: buffer });
+    const result = await parser.getText();
+    content = result.text;
+    await parser.destroy();
+    type = 'pdf';
   } else {
     console.log(`⏭️  Bỏ qua: ${filename} (chưa hỗ trợ ${ext})`);
     return;
@@ -92,10 +101,10 @@ async function main() {
   function getAllFiles(dirPath: string, arrayOfFiles: string[] = []) {
     const files = fs.readdirSync(dirPath);
     files.forEach((file) => {
-      if (!file.startsWith('.')) {
+      if (!file.startsWith('.') && !file.startsWith('~$')) {
         if (fs.statSync(dirPath + "/" + file).isDirectory()) {
           arrayOfFiles = getAllFiles(dirPath + "/" + file, arrayOfFiles);
-        } else if (file.endsWith('.txt') || file.endsWith('.docx')) {
+        } else if (file.endsWith('.txt') || file.endsWith('.docx') || file.endsWith('.pdf')) {
           arrayOfFiles.push(path.join(dirPath, "/", file));
         }
       }
